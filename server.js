@@ -2,8 +2,8 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 const root = process.cwd();
-const publicFiles = new Set(['index.html', 'style.css', 'app.js', 'god-mode.js', 'simulation.js', 'city-mode.js', 'city-simulation.js', 'city.css', 'world-mode.js', 'world-simulation.js', 'world.css', 'preview.png', 'favicon.svg']);
-const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const publicFiles = new Set(['index.html', 'style.css', 'app.js', 'god-mode.js', 'simulation.js', 'city-mode.js', 'city-simulation.js', 'city.css', 'world-mode.js', 'world-simulation.js', 'world.css', 'earth-data.js', 'earth-geography.js', 'earth-renderer.js', 'data/earth-blue-marble.jpg', 'preview.png', 'favicon.svg']);
+const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const server = http.createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

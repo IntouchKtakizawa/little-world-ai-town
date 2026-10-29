@@ -42,7 +42,7 @@ npm run check
 npm test
 ```
 
-Twenty-six automated tests cover world diplomacy and battles, city construction and research, area effects, stat bounds, save validation, safe text rendering, zero-time movement, and fast-forward routing. GitHub Actions runs syntax checks and tests on pushes and pull requests.
+Thirty-five automated tests cover Earth geography, world diplomacy and battles, city construction and research, area effects, stat bounds, save validation, safe text rendering, zero-time movement, and fast-forward routing. GitHub Actions runs syntax checks and tests on pushes and pull requests.
 
 The browser was also used to verify weather reactions, custom resident creation, saving and reloading, lightning damage and memories, healing, time controls, and map interactions.
 
@@ -106,3 +106,21 @@ Six national technologies cover navigation, trade logistics, agriculture, energy
 The new **World guide** explains the controls in the app. Ownership, troops, active battles, treaties, trade routes, stockpiles, and technologies autosave in this browser. Reloading preserves the campaign; no offline progress is simulated. **Grant resources** provides sandbox funding. **New beginning** resets all three layers.
 
 The suite now includes **26 tests**, including trade shipments and shortages, war authorization, capture and defeat, peace withdrawals, alliances, counterattacks, technology unlocks, and world save validation. Browser verification also covers actual shipments, recruitment, conquest, counterattacks, peace, and an alliance.
+
+## Earth (v0.5)
+
+The world view now uses **real Earth geography** rather than the original hex silhouette:
+
+- **242 mapped countries and regions**, including protected Antarctica; 241 playable country/region identities.
+- **NASA Blue Marble** terrain and **Natural Earth 1:50m** boundaries, with **542 real city markers**, including capitals and smaller mapped countries such as Singapore.
+- **Satellite, Political, Population, and Resources** map layers, country search, geographic selection, focus, mouse-wheel zoom, + / − controls, and drag-to-pan. A simulated day/night overlay is optional.
+- Country details show real geographic region, mapped capital/city hubs, historical source-population estimates, and a clearly labeled game biome.
+- Land movement uses shared geographic borders. Overseas campaigns require Ocean navigation.
+- **Change country** starts a new peaceful Earth campaign as the selected country or region. **Restore previous** restores the backed-up Earth campaign without touching the town or city-builder saves.
+- Geography, boundaries, and historic population inputs come from source data; resource output, military forces, diplomacy, development, and wars remain fictional game rules. New campaigns do not reproduce real current conflicts or alliances.
+
+See [data/SOURCES.md](data/SOURCES.md) for asset credits, exact input URLs, derivation details, and what is real versus simulated. The basemap and geography are bundled locally. Rendering caches the terrain and country fills, while selected boundaries and zoomed outlines remain vector-based.
+
+To rebuild `earth-data.js`, download the two 50m Natural Earth GeoJSON inputs linked in the sources document to `/tmp/earth-countries.geojson` and `/tmp/earth-cities.geojson`, then run `python3 scripts/prepare-earth.py`.
+
+There are now **35 automated tests**. The Earth tests verify real coastline picking (including Singapore), projection round trips, actual land neighbors, starting as different countries, development, foreign trade, fictional combat, protected Antarctica, and preserving gameplay across geography updates. Browser checks cover Earth rendering, Japan/Thailand focus, campaign switching and restoring, and the map controls.
