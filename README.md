@@ -42,7 +42,7 @@ npm run check
 npm test
 ```
 
-Fourteen automated tests cover city construction and research, area effects, stat bounds, save validation, safe text rendering, zero-time movement, and fast-forward routing. GitHub Actions runs syntax checks and tests on pushes and pull requests.
+Twenty-six automated tests cover world diplomacy and battles, city construction and research, area effects, stat bounds, save validation, safe text rendering, zero-time movement, and fast-forward routing. GitHub Actions runs syntax checks and tests on pushes and pull requests.
 
 The browser was also used to verify weather reactions, custom resident creation, saving and reloading, lightning damage and memories, healing, time controls, and map interactions.
 
@@ -76,3 +76,33 @@ The new **City region** view is a city builder with six connected cities, 36 bui
 The city population is an aggregate model; named residents retain their individual profiles and memories. City state, research, buildings, policies, conflict, and pets autosave separately alongside the original world. There is no cloud sync or offline progression. **New beginning** resets both.
 
 The automated suite now contains 14 tests, including expansion costs, occupied plots, research prerequisites, unlocks, building upgrades, conflict effects, and city save validation. Browser checks cover construction, research completion, adoption, peace negotiations, and repairs.
+
+## Nations & Territories (v0.4)
+
+The **World map** adds a separate strategy layer: an original simplified world silhouette with **148 hex territories and six fictional nations**. Lead the Willow Republic from peace, trade and alliances, or choose war. The world map is not a map of real countries or geopolitical predictions.
+
+### Territory and city control
+
+Click a hex to inspect its owner, produced resource, city level, population, and troops. Claim adjacent neutral territory for 180 national credits. Develop owned cities up to level 5, recruit troops, and transfer forces while retaining a five-unit garrison. **Ocean navigation** unlocks remote claims, transfers, and expeditions. **Manage your cities** opens the existing detailed city builder.
+
+National treasury and stockpiles support territorial development, diplomacy, armies, and trade. The City region retains its municipal budget, detailed buildings, pets, and city research. Both layers progress under the same pause and speed controls and retain their own saved state.
+
+### Trade and diplomacy
+
+Use **World trade** to choose a country, export resource, import resource, and shipment size. Agreements exchange resources 1:1 every 15 simulation seconds and earn revenue. Routes pause if exports are insufficient or a partner no longer has territory. Other countries act as suppliers capable of fulfilling accepted exchanges; they do not simulate separate depleting stockpiles. Trade lines and moving ships appear on the map.
+
+Gifts improve relations, and 65 relations permit an alliance. Alliances block war declarations until ended. Countries begin at peace and do not invade the player unless the player chooses war.
+
+### Optional campaigns
+
+**Diplomacy → Declare war** opens a second deliberate choice. War ends trade with that country and enables both invasions and counterattacks. Select enemy land, choose a staging territory, recruit there if needed, and send forces. Troops must exceed the displayed defender strength to win. City levels and territorial-defense technology improve defense. Battles resolve over 30 simulation seconds. Captured cities lose a level and ownership changes on the map. Defeated forces are lost; enemy countries mobilize and can counterattack.
+
+Negotiate peace for 200 credits to stop campaigns, return surviving deployed forces, and keep current borders. Conquest is not required to progress.
+
+### World technology and persistence
+
+Six national technologies cover navigation, trade logistics, agriculture, energy, defense, and civic institutions. They complement the city builder’s broader 12-project research tree. Discovery requires both national credits and science and progresses with simulation time.
+
+The new **World guide** explains the controls in the app. Ownership, troops, active battles, treaties, trade routes, stockpiles, and technologies autosave in this browser. Reloading preserves the campaign; no offline progress is simulated. **Grant resources** provides sandbox funding. **New beginning** resets all three layers.
+
+The suite now includes **26 tests**, including trade shipments and shortages, war authorization, capture and defeat, peace withdrawals, alliances, counterattacks, technology unlocks, and world save validation. Browser verification also covers actual shipments, recruitment, conquest, counterattacks, peace, and an alliance.
