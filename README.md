@@ -128,3 +128,11 @@ There are now **35 automated tests**. The Earth tests verify real coastline pick
 ## GitHub Pages deployment
 
 `npm run build` creates a static `dist/` directory. The GitHub Pages workflow checks the code, runs the tests, and deploys that directory on pushes to `main` or manual workflow runs. In repository **Settings → Pages**, select **GitHub Actions** as the source. GitHub Free requires a public repository for Pages; a private source repository requires an eligible paid plan. Saved games remain local to each visitor's browser.
+
+## A world that reaches out (v0.6)
+
+Countries now initiate simulated diplomacy through **Diplomatic inbox**: recurring trade, food aid, joint research, cultural exchanges, alliance invitations at strong relations, and peace talks during player-chosen wars. Each proposal shows its costs and benefits; accept, decline, discuss, or let it expire. Contacts arrive every 45 simulation seconds, with at most four pending offers. **Invite a delegation** advances the next contact. Countries still never start an unrequested war.
+
+Click a real city name (for example **Bangkok**) in country details, or a visible city marker, to open its profile. Fund healthcare, housing, and transport up to level five with the national treasury. Healthcare supports science output; housing and transit increase country income. All ratings are simulated. The city builder uses the selected country's real mapped cities; extra areas are explicitly named districts. Municipal construction and budgets are preserved separately for each country, including existing Thai-region saves. National service investments and municipal construction remain distinct systems.
+
+The 40-test suite covers incoming proposals, one-time acceptance, resource shortages, expiry, alliances, war restrictions, real-city investment effects, and save migration alongside existing simulation behavior.
