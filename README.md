@@ -124,3 +124,7 @@ See [data/SOURCES.md](data/SOURCES.md) for asset credits, exact input URLs, deri
 To rebuild `earth-data.js`, download the two 50m Natural Earth GeoJSON inputs linked in the sources document to `/tmp/earth-countries.geojson` and `/tmp/earth-cities.geojson`, then run `python3 scripts/prepare-earth.py`.
 
 There are now **35 automated tests**. The Earth tests verify real coastline picking (including Singapore), projection round trips, actual land neighbors, starting as different countries, development, foreign trade, fictional combat, protected Antarctica, and preserving gameplay across geography updates. Browser checks cover Earth rendering, Japan/Thailand focus, campaign switching and restoring, and the map controls.
+
+## GitHub Pages deployment
+
+`npm run build` creates a static `dist/` directory. The GitHub Pages workflow checks the code, runs the tests, and deploys that directory on pushes to `main` or manual workflow runs. In repository **Settings → Pages**, select **GitHub Actions** as the source. GitHub Free requires a public repository for Pages; a private source repository requires an eligible paid plan. Saved games remain local to each visitor's browser.
