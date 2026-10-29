@@ -42,7 +42,7 @@ npm run check
 npm test
 ```
 
-Seven automated tests cover area effects, stat bounds, save validation, safe text rendering, zero-time movement, and fast-forward routing. GitHub Actions runs syntax checks and tests on pushes and pull requests.
+Fourteen automated tests cover city construction and research, area effects, stat bounds, save validation, safe text rendering, zero-time movement, and fast-forward routing. GitHub Actions runs syntax checks and tests on pushes and pull requests.
 
 The browser was also used to verify weather reactions, custom resident creation, saving and reloading, lightning damage and memories, healing, time controls, and map interactions.
 
@@ -60,3 +60,19 @@ Behavior and contextual dialogue run locally. This version does **not** call a l
 - `style.css` / `index.html`: responsive interface and accessible controls
 - `server.js`: local server with an explicit public-file allowlist
 - `tests/simulation.test.js`: simulation regression tests
+
+## Cities & Civilization (v0.3)
+
+The new **City region** view is a city builder with six connected cities, 36 building plots, 16 building types, and upgrades to level 5. The original town and its named residents remain available through **Original town**.
+
+- **Build:** choose a blueprint, press **Build on the map**, and click an empty `+` plot. **Expand region** purchases the next city. Inspect buildings to upgrade them. Housing raises aggregate city population; commercial buildings generate income; clinics, parks, labs, and defenses provide services.
+- **Research:** 12 projects cover healthcare, construction, energy, transit, electric vehicles, agriculture, education, veterinary care, civil resilience, diplomacy, and automation. Labs and funding determine progress. Discoveries unlock hospitals, skyscrapers, solar farms, universities, transit stations, and defense headquarters, or improve city stats. Research is a fictional game mechanic, not real scientific work.
+- **City Hall:** set taxes, healthcare funding, research funding, and traffic density. Cars move through the region; transit and electric mobility research change the traffic. Higher taxes increase revenue and lower happiness. Services cost credits.
+- **Cats & dogs:** adopt up to 40 pets. Each has a name, home city, health, an animated map presence, and an inspectable profile. Feed and care for them directly.
+- **Diplomacy:** declare conflict with fictional neighbors, invest in defenses, negotiate peace, and repair the region. Conflict lowers trade income, health, and happiness and damages buildings over time. It does not automatically result in victory or conquest.
+- **Divine powers:** expand the drawer for weather and miracles. Targeted resident powers switch to the original town so their targets match the map. **Grant 5,000 credits** funds sandbox experiments.
+- **City guide:** the `? City guide` button explains each control inside the app.
+
+The city population is an aggregate model; named residents retain their individual profiles and memories. City state, research, buildings, policies, conflict, and pets autosave separately alongside the original world. There is no cloud sync or offline progression. **New beginning** resets both.
+
+The automated suite now contains 14 tests, including expansion costs, occupied plots, research prerequisites, unlocks, building upgrades, conflict effects, and city save validation. Browser checks cover construction, research completion, adoption, peace negotiations, and repairs.
