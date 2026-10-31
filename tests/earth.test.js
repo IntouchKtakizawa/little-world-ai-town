@@ -1,15 +1,122 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {EARTH_COUNTRIES,EARTH_NATIONS,EARTH_BY_ID} from '../earth-data.js';
-import {project,unproject,countryAt,countryClimate} from '../earth-geography.js';
-import {createEarthWorld,validateWorld,neighbors,nationStats,develop,recruit,declareWar,attack,peace,claim,signTrade,advanceWorld,upgradeEarthWorld} from '../world-simulation.js';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { EARTH_COUNTRIES, EARTH_NATIONS, EARTH_BY_ID } from "../earth-data.js";
+import {
+  project,
+  unproject,
+  countryAt,
+  countryClimate,
+} from "../earth-geography.js";
+import {
+  createEarthWorld,
+  validateWorld,
+  neighbors,
+  nationStats,
+  develop,
+  recruit,
+  declareWar,
+  attack,
+  peace,
+  claim,
+  signTrade,
+  advanceWorld,
+  upgradeEarthWorld,
+} from "../world-simulation.js";
 
-test('Earth includes detailed geography, smaller countries, and real city locations',()=>{assert.equal(EARTH_COUNTRIES.length,242);assert.equal(EARTH_NATIONS.length,241);assert.ok(EARTH_BY_ID.SGP);assert.ok(EARTH_BY_ID.THA.cities.some(c=>c.name==='Bangkok'&&c.capital));assert.ok(EARTH_BY_ID.THA.cities.some(c=>c.name==='Chiang Mai'));});
-test('map projection round trips geographic locations',()=>{for(const [lon,lat] of [[100.5,13.75],[-77,38.9],[179,-17],[-180,-90]]){const p=project(lon,lat),result=unproject(p.x,p.y);assert.ok(Math.abs(result.lon-lon)<1e-9);assert.ok(Math.abs(result.lat-lat)<1e-9);}});
-test('real country picking follows coastlines instead of nearest hex centers',()=>{for(const [lon,lat,id] of [[100.51,13.75,'THA'],[-77.036,38.907,'USA'],[2.35,48.85,'FRA'],[139.69,35.68,'JPN'],[103.82,1.35,'SGP']])assert.equal(countryAt(lon,lat)?.id,id);assert.equal(countryAt(-140,0),null);assert.equal(countryAt(0,-30),null);});
-test('land movement follows actual shared boundaries',()=>{const s=createEarthWorld(),tile=id=>s.tiles.find(t=>t.id===id);assert.equal(neighbors(tile('THA'),tile('MMR')),true);assert.equal(neighbors(tile('THA'),tile('MYS')),true);assert.equal(neighbors(tile('THA'),tile('USA')),false);assert.equal(neighbors(tile('GBR'),tile('FRA')),false);});
-test('any mapped playable country can start a peaceful, valid campaign',()=>{for(const player of ['THA','USA','JPN','FRA','SGP']){const s=createEarthWorld(player);assert.equal(s.player,player);assert.equal(validateWorld(s),true);assert.equal(s.wars.length,0);assert.equal(nationStats(s).territories,1);assert.equal(nationStats(s).population,EARTH_BY_ID[player].population);}});
-test('country development and foreign trade operate on the selected Earth player',()=>{const s=createEarthWorld('THA'),tile=s.tiles.find(t=>t.id==='THA'),level=tile.city;assert.ok(develop(s,'THA').tile);assert.equal(tile.city,level+1);assert.ok(signTrade(s,'JPN','food','metal',5).route);advanceWorld(s,15);assert.equal(s.trades[0].shipments,1);assert.equal(s.relations.JPN,46);});
-test('Earth combat uses real neighbors and changes ownership under fictional game rules',()=>{const s=createEarthWorld('THA');recruit(s,'THA');recruit(s,'THA');declareWar(s,'MMR');assert.ok(attack(s,'THA','MMR',120).battle);advanceWorld(s,30);assert.equal(s.tiles.find(t=>t.id==='MMR').owner,'THA');assert.equal(nationStats(s).territories,2);assert.ok(!peace(s,'MMR').error);assert.equal(validateWorld(s),true);});
-test('Antarctica stays protected and biome labels vary geographically',()=>{const s=createEarthWorld();assert.ok(claim(s,'ATA').error);assert.equal(countryClimate(EARTH_BY_ID.THA),'Tropical');assert.equal(countryClimate(EARTH_BY_ID.EGY),'Arid');assert.equal(countryClimate(EARTH_BY_ID.ATA),'Polar');});
-test('dataset upgrades preserve a campaign and add missing countries and cities',()=>{const s=createEarthWorld('THA');develop(s,'THA');s.treasury=1234;s.tiles=s.tiles.filter(t=>t.id!=='SGP');delete s.relations.SGP;const next=upgradeEarthWorld(JSON.parse(JSON.stringify(s)));assert.equal(next.treasury,1234);assert.equal(next.tiles.find(t=>t.id==='THA').city,s.tiles.find(t=>t.id==='THA').city);assert.ok(next.tiles.some(t=>t.id==='SGP'));assert.equal(validateWorld(next),true);});
+test("Earth includes detailed geography, smaller countries, and real city locations", () => {
+  assert.equal(EARTH_COUNTRIES.length, 242);
+  assert.equal(EARTH_NATIONS.length, 241);
+  assert.ok(EARTH_BY_ID.SGP);
+  assert.ok(
+    EARTH_BY_ID.THA.cities.some((c) => c.name === "Bangkok" && c.capital),
+  );
+  assert.ok(EARTH_BY_ID.THA.cities.some((c) => c.name === "Chiang Mai"));
+});
+test("map projection round trips geographic locations", () => {
+  for (const [lon, lat] of [
+    [100.5, 13.75],
+    [-77, 38.9],
+    [179, -17],
+    [-180, -90],
+  ]) {
+    const p = project(lon, lat),
+      result = unproject(p.x, p.y);
+    assert.ok(Math.abs(result.lon - lon) < 1e-9);
+    assert.ok(Math.abs(result.lat - lat) < 1e-9);
+  }
+});
+test("real country picking follows coastlines instead of nearest hex centers", () => {
+  for (const [lon, lat, id] of [
+    [100.51, 13.75, "THA"],
+    [-77.036, 38.907, "USA"],
+    [2.35, 48.85, "FRA"],
+    [139.69, 35.68, "JPN"],
+    [103.82, 1.35, "SGP"],
+  ])
+    assert.equal(countryAt(lon, lat)?.id, id);
+  assert.equal(countryAt(-140, 0), null);
+  assert.equal(countryAt(0, -30), null);
+});
+test("land movement follows actual shared boundaries", () => {
+  const s = createEarthWorld(),
+    tile = (id) => s.tiles.find((t) => t.id === id);
+  assert.equal(neighbors(tile("THA"), tile("MMR")), true);
+  assert.equal(neighbors(tile("THA"), tile("MYS")), true);
+  assert.equal(neighbors(tile("THA"), tile("USA")), false);
+  assert.equal(neighbors(tile("GBR"), tile("FRA")), false);
+});
+test("any mapped playable country can start a peaceful, valid campaign", () => {
+  for (const player of ["THA", "USA", "JPN", "FRA", "SGP"]) {
+    const s = createEarthWorld(player);
+    assert.equal(s.player, player);
+    assert.equal(validateWorld(s), true);
+    assert.equal(s.wars.length, 0);
+    assert.equal(nationStats(s).territories, 1);
+    assert.equal(nationStats(s).population, EARTH_BY_ID[player].population);
+  }
+});
+test("country development and foreign trade operate on the selected Earth player", () => {
+  const s = createEarthWorld("THA"),
+    tile = s.tiles.find((t) => t.id === "THA"),
+    level = tile.city;
+  assert.ok(develop(s, "THA").tile);
+  assert.equal(tile.city, level + 1);
+  assert.ok(signTrade(s, "JPN", "food", "metal", 5).route);
+  advanceWorld(s, 15);
+  assert.equal(s.trades[0].shipments, 1);
+  assert.equal(s.relations.JPN, 46);
+});
+test("Earth combat uses real neighbors and changes ownership under fictional game rules", () => {
+  const s = createEarthWorld("THA");
+  recruit(s, "THA");
+  recruit(s, "THA");
+  declareWar(s, "MMR");
+  assert.ok(attack(s, "THA", "MMR", 120).battle);
+  advanceWorld(s, 30);
+  assert.equal(s.tiles.find((t) => t.id === "MMR").owner, "THA");
+  assert.equal(nationStats(s).territories, 2);
+  assert.ok(!peace(s, "MMR").error);
+  assert.equal(validateWorld(s), true);
+});
+test("Antarctica stays protected and biome labels vary geographically", () => {
+  const s = createEarthWorld();
+  assert.ok(claim(s, "ATA").error);
+  assert.equal(countryClimate(EARTH_BY_ID.THA), "Tropical");
+  assert.equal(countryClimate(EARTH_BY_ID.EGY), "Arid");
+  assert.equal(countryClimate(EARTH_BY_ID.ATA), "Polar");
+});
+test("dataset upgrades preserve a campaign and add missing countries and cities", () => {
+  const s = createEarthWorld("THA");
+  develop(s, "THA");
+  s.treasury = 1234;
+  s.tiles = s.tiles.filter((t) => t.id !== "SGP");
+  delete s.relations.SGP;
+  const next = upgradeEarthWorld(JSON.parse(JSON.stringify(s)));
+  assert.equal(next.treasury, 1234);
+  assert.equal(
+    next.tiles.find((t) => t.id === "THA").city,
+    s.tiles.find((t) => t.id === "THA").city,
+  );
+  assert.ok(next.tiles.some((t) => t.id === "SGP"));
+  assert.equal(validateWorld(next), true);
+});

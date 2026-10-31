@@ -1,75 +1,876 @@
-import {EARTH_BY_ID} from './earth-data.js';
-import {BUILDINGS,RESEARCH,slotPosition,expansionCost,createCityState,cityStats,construct,expand,beginResearch,upgrade,advanceCity,validateCity} from './city-simulation.js';
-import {escapeHTML,clamp,affectResident} from './simulation.js';
-const KEY='little-world:cities:v1';
-export function createCityMode(api){
-  const $=s=>document.querySelector(s);let countryId='THA',state=createCityState(),view='city',section='build',blueprint='house',mode='inspect',selectedDistrict=0,lastSave=0,paintTime=0,lastUI=0;
-  try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved?.state&&saved.state.trafficDensity===undefined)saved.state.trafficDensity=55;if(validateCity(saved?.state)){state=saved.state;countryId=EARTH_BY_ID[saved.countryId]?saved.countryId:'THA';view=saved.view==='village'?'village':'city'}}catch{}
-  function districtNames(){const c=EARTH_BY_ID[countryId],names=c.cities.map(h=>h.name);return Array.from({length:6},(_,i)=>names[i]||`${names[0]||c.name} · ${['North','South','East','West','Central','Outer'][i]} district`)}
-  const powers=document.createElement('details');powers.className='divine-drawer';powers.innerHTML='<summary><span>✧ Divine powers</span><small>Weather · lightning · blessings · create residents</small><b>⌄</b></summary>';$('.god-panel').before(powers);powers.append($('.god-panel'));
-  const root=document.createElement('section');root.className='city-command';root.innerHTML=`<div class="city-header"><div><div class="eyebrow">FROM A LITTLE TOWN TO AN ENTIRE WORLD</div><h2>Build something bigger<span>.</span></h2></div><button id="city-guide" title="How to control your cities">? City guide</button></div><div class="city-metrics"><div><small>TREASURY</small><strong id="city-money"></strong></div><div><small>CITY POPULATION</small><strong id="city-population"></strong></div><div><small>PUBLIC HEALTH</small><strong id="city-health"></strong></div><div><small>HAPPINESS</small><strong id="city-happiness"></strong></div><div><small>CASH FLOW / MIN</small><strong id="city-income"></strong></div></div><nav class="city-tabs" aria-label="City management">${[['build','▥','Build'],['research','⚗','Research'],['hall','⚙','City Hall'],['pets','♧','Cats & dogs'],['conflict','⚑','Diplomacy']].map(([id,icon,label])=>`<button data-city-section="${id}" aria-pressed="${id==='build'}" class="${id==='build'?'active':''}">${icon} ${label}</button>`).join('')}</nav><div id="city-panel-body"></div><div class="city-bottom"><span id="city-status">Your next chapter starts with an empty plot.</span><button id="city-grant">✧ Grant 5,000 credits</button></div>`;powers.before(root);
-  const tools=document.createElement('div');tools.className='city-map-toolbar';tools.innerHTML='<div><button id="view-city" class="active" aria-pressed="true">▦ City region</button><button id="view-village" aria-pressed="false">⌂ Original town</button></div><span id="city-map-instruction">Click a building, person, or pet to inspect.</span>';$('.map-top').after(tools);
-  const dialog=document.createElement('dialog');dialog.id='city-dialog';dialog.innerHTML='<button class="close-dialog" aria-label="Close city details">×</button><div id="city-dialog-body"></div>';document.body.append(dialog);dialog.querySelector('button').onclick=()=>dialog.close();
-  const money=n=>Math.round(n).toLocaleString();
-  function save(){try{localStorage.setItem(KEY,JSON.stringify({state,view,countryId}));$('#city-status').dataset.saved='true'}catch{api.toast('City autosave is unavailable in this browser.')}}
-  function commit(message,icon='▥'){if(message)api.log(message,icon);refresh();save()}
-  function result(r,onSuccess){if(r.error){api.toast(r.error);return false}onSuccess(r);return true}
-  function setView(value){api.onView?.();view=value;mode='inspect';api.resetZoom();$('#view-city').classList.toggle('active',view==='city');$('#view-village').classList.toggle('active',view==='village');$('#view-city').setAttribute('aria-pressed',String(view==='city'));$('#view-village').setAttribute('aria-pressed',String(view==='village'));$('.town-title').innerHTML='<span class="live-dot"></span> '+(view==='city'?EARTH_BY_ID[countryId].name.toUpperCase()+' · CITY REGION':'WILLOWBROOK');$('#canvas-wrap').classList.toggle('city-view',view==='city');$('.map-note').innerHTML='<span>↖</span> '+(view==='city'?'Click buildings, residents, cats & dogs':'Click a resident to meet them');$('#city-map-instruction').textContent=view==='city'?'Click a building, person, or pet to inspect.':'Your original town and all its memories.';$('#city-map-instruction').classList.remove('placing');$('#world').setAttribute('aria-label',view==='city'?'Interactive region of six cities. Build on empty plots or inspect buildings, pets, and residents.':'Interactive map of Willowbrook. Inspect residents on the map or in the Residents panel.');save()}
-  function showSection(value){section=value;document.querySelectorAll('[data-city-section]').forEach(b=>{b.classList.toggle('active',b.dataset.citySection===value);b.setAttribute('aria-pressed',String(b.dataset.citySection===value))});renderPanel()}
-  function armBuild(){if(view!=='city')setView('city');api.inspectPower();mode='build';$('#city-map-instruction').textContent=`BUILD ${BUILDINGS[blueprint].name.toUpperCase()} · Click an empty + plot`;$('#city-map-instruction').classList.add('placing');api.toast(`Choose an empty plot to build ${BUILDINGS[blueprint].name.toLowerCase()}.`);$('.map-card').scrollIntoView({behavior:'smooth',block:'center'})}
-  function renderPanel(){
-    const body=$('#city-panel-body');
-    if(section==='build'){
-      body.innerHTML=`<div class="build-heading"><div><strong>${state.districts.length} connected cities · ${state.buildings.length} buildings</strong><p>Start with a plot. Grow into a skyline.</p></div><button id="expand-region" class="primary-button" ${state.districts.length>=6?'disabled':''}>+ ${state.districts.length>=6?'All cities connected':`Expand region · ${money(expansionCost(state))} cr`}</button></div><div class="construction-row"><label>Building blueprint<select id="building-blueprint" aria-label="Building blueprint">${Object.entries(BUILDINGS).map(([id,b])=>`<option value="${id}" ${id===blueprint?'selected':''}>${b.icon} ${b.name} · ${money(b.cost)} cr${b.requires&&!state.completed.includes(b.requires)?' · Research required':''}</option>`).join('')}</select></label><button id="arm-building" class="primary-button">Build on the map ↗</button><button id="inspect-city" class="secondary-button">Inspect</button></div><div id="blueprint-details"></div><div class="district-list">${districtNames().map((name,i)=>`<button data-district="${i}" class="${state.districts.includes(i)?'available':'locked'} ${selectedDistrict===i?'selected':''}"><span>${state.districts.includes(i)?'▦':'◇'}</span>${escapeHTML(name)}<small>${state.districts.includes(i)?state.buildings.filter(b=>b.district===i).length+'/6 plots':'Unclaimed'}</small></button>`).join('')}</div>`;
-      $('#building-blueprint').onchange=e=>{blueprint=e.target.value;blueprintDetail()};$('#arm-building').onclick=armBuild;$('#inspect-city').onclick=()=>{mode='inspect';api.inspectPower();$('#city-map-instruction').textContent='Click a building, person, or pet to inspect.';$('#city-map-instruction').classList.remove('placing')};$('#expand-region').onclick=()=>result(expand(state),r=>{selectedDistrict=r.district;setView('city');commit(`<strong>${districtNames()[r.district]}</strong> joined your region. Six new plots are ready.`);api.toast(`Welcome to ${districtNames()[r.district]}. Your world just got bigger.`);renderPanel()});body.querySelectorAll('[data-district]').forEach(b=>b.onclick=()=>{const id=+b.dataset.district;if(!state.districts.includes(id)){api.toast('Use Expand region to connect the next city.');return}selectedDistrict=id;setView('city');renderPanel();api.toast(`${districtNames()[id]} is highlighted on the map.`)});blueprintDetail();
+import { EARTH_BY_ID } from "./earth-data.js";
+import {
+  BUILDINGS,
+  RESEARCH,
+  slotPosition,
+  expansionCost,
+  createCityState,
+  cityStats,
+  construct,
+  expand,
+  beginResearch,
+  upgrade,
+  advanceCity,
+  validateCity,
+} from "./city-simulation.js";
+import { escapeHTML, clamp, affectResident } from "./simulation.js";
+const KEY = "little-world:cities:v1";
+export function createCityMode(api) {
+  const $ = (s) => document.querySelector(s);
+  let countryId = "THA",
+    state = createCityState(),
+    view = "city",
+    section = "build",
+    blueprint = "house",
+    mode = "inspect",
+    selectedDistrict = 0,
+    lastSave = 0,
+    paintTime = 0,
+    lastUI = 0;
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY));
+    if (saved?.state && saved.state.trafficDensity === undefined)
+      saved.state.trafficDensity = 55;
+    if (validateCity(saved?.state)) {
+      state = saved.state;
+      countryId = EARTH_BY_ID[saved.countryId] ? saved.countryId : "THA";
+      view = saved.view === "village" ? "village" : "city";
     }
-    if(section==='research'){
-      const stats=cityStats(state);body.innerHTML=`<div class="research-overview"><div><strong>Ideas today. A different world tomorrow.</strong><p>${stats.labs.toFixed(1)} lab capacity · ${state.completed.length}/${Object.keys(RESEARCH).length} discoveries · ${state.researchFunding}% funding</p></div><span class="simulation-tag">FICTIONAL GAME RESEARCH</span></div><div id="active-project"></div><div class="research-grid">${Object.entries(RESEARCH).map(([id,r])=>{let done=state.completed.includes(id),locked=r.requires&&!state.completed.includes(r.requires);return `<article class="research-project ${done?'complete':''}"><div><span>${r.icon} ${r.field}</span><b>${done?'✓ DISCOVERED':money(r.cost)+' CR'}</b></div><h3>${r.name}</h3><p>${r.description}</p><small>${r.unlocks}</small><button data-research="${id}" ${done||locked||state.activeResearch?'disabled':''}>${done?'Completed':state.activeResearch===id?'Researching…':locked?'Requires '+RESEARCH[r.requires].name:'Fund research · '+r.duration+'s'}</button></article>`}).join('')}</div><p class="city-footnote">Research produces game upgrades, not real scientific findings. Use time controls to speed progress. More labs, education, and research funding increase the rate.</p>`;body.querySelectorAll('[data-research]').forEach(b=>b.onclick=()=>result(beginResearch(state,b.dataset.research),r=>{commit(`You funded <strong>${r.project.name}</strong>. Your labs are getting to work.`,'⚗');renderPanel()}));updateResearch();
-    }
-    if(section==='hall'){
-      body.innerHTML=`<div class="research-overview"><div><strong>Your city. Your priorities.</strong><p>Balance income, public services, and long-term discoveries.</p></div><span class="simulation-tag">LIVE CITY POLICIES</span></div><div class="policy-grid">${[['tax','Tax rate',25,'%','Higher taxes raise revenue but reduce happiness.'],['healthFunding','Healthcare funding',100,'%','Public healthcare improves the region’s health.'],['researchFunding','Research funding',100,'%','More funding means faster discoveries and higher costs.'],['trafficDensity','Traffic density',100,'%','Set street traffic from car-free to a busy city. Transit research adds buses.']].map(([key,name,max,unit,desc])=>`<label>${name}<strong id="policy-${key}">${state[key]}${unit}</strong><input type="range" id="input-${key}" data-policy="${key}" aria-label="${name}" min="0" max="${max}" value="${state[key]}"><small>${desc}</small></label>`).join('')}</div><div class="city-help-note">Income is collected as simulation time passes. Apartments bring citizens; shops and offices create income; parks raise happiness; clinics and hospitals support health. Building upgrades multiply their effects.</div>`;body.querySelectorAll('[data-policy]').forEach(input=>{input.oninput=e=>{state[input.dataset.policy]=+e.target.value;$('#policy-'+input.dataset.policy).textContent=e.target.value+'%';refresh()};input.onchange=()=>commit('You adjusted the city budget.','⚙')});
-    }
-    if(section==='pets'){
-      body.innerHTML=`<div class="research-overview"><div><strong>A city feels like home with a few more paws.</strong><p>${state.pets.length} cats & dogs wander your neighborhoods.</p></div><span class="simulation-tag">CLICK PETS ON THE MAP</span></div><form id="pet-form" class="pet-form"><label>Pet’s name<input name="name" required maxlength="24" placeholder="e.g. Mochi"></label><label>Companion<select name="type" aria-label="Pet type"><option value="cat">Cat</option><option value="dog">Dog</option></select></label><button class="primary-button" type="submit">Adopt · 50 cr</button></form><div class="pet-roster">${state.pets.map(p=>`<button data-pet="${p.id}"><span>${p.type==='cat'?'♧':'♧'}</span><strong>${escapeHTML(p.name)}</strong><small>${p.type} · ${Math.round(p.health)}% health · ${districtNames()[p.district]}</small><b>↗</b></button>`).join('')}</div><p class="city-footnote">Cats and dogs have their own health and move around their home city. Veterinary care improves their health over time.</p>`;$('#pet-form').onsubmit=e=>{e.preventDefault();if(state.pets.length>=40){api.toast('This region has room for 40 companions.');return}if(state.treasury<50){api.toast('Adoption needs 50 credits.');return}const data=new FormData(e.target),name=data.get('name').trim();if(!name)return;state.treasury-=50;state.pets.push({id:Math.max(0,...state.pets.map(p=>p.id))+1,type:data.get('type'),name,health:100,district:selectedDistrict});commit(`<strong>${escapeHTML(name)}</strong> found a home in ${districtNames()[selectedDistrict]}.`,'♡');renderPanel()};body.querySelectorAll('[data-pet]').forEach(b=>b.onclick=()=>petDetail(+b.dataset.pet));
-    }
-    if(section==='conflict'){
-      body.innerHTML=`<div class="research-overview"><div><strong>Power comes with consequences.</strong><p>Manage fictional rivals, defend your people, or choose peace.</p></div><span class="conflict-badge ${state.conflict.active?'war':''}">${state.conflict.active?'CONFLICT ACTIVE':'AT PEACE'}</span></div><div class="diplomacy-layout"><div><label class="neighbor-label">Neighboring state<select id="neighbor" aria-label="Neighboring state">${['Ironvale','Redhaven','Stonewatch'].map(n=>`<option ${n===state.conflict.neighbor?'selected':''}>${n}</option>`).join('')}</select></label><p class="city-footnote">Conflict reduces income and happiness and gradually damages buildings. Shelters, resilience research, and defense HQs reduce damage. No side automatically wins.</p><div class="diplomacy-buttons"><button id="declare-conflict" class="danger-button" ${state.conflict.active?'disabled':''}>⚑ Declare conflict</button><button id="make-peace" class="primary-button" ${!state.conflict.active?'disabled':''}>Negotiate peace · ${state.completed.includes('diplomacy')?100:300} cr</button></div></div><div class="conflict-numbers"><span>Defense <b id="defense-value"></b></span><span>Building condition <b id="condition-value"></b></span><span>Relations <b id="relations-value"></b></span><button id="repair-region" class="secondary-button">Repair the region</button></div></div>`;$('#neighbor').disabled=state.conflict.active;$('#neighbor').onchange=e=>{state.conflict.neighbor=e.target.value;save()};$('#declare-conflict').onclick=()=>{state.conflict.active=true;state.conflict.tension=70;api.people.forEach(p=>{affectResident(p,{social:-10});api.remember(p,`Conflict broke out with ${state.conflict.neighbor}. Worried about the city.`)});commit(`Conflict began with <strong>${state.conflict.neighbor}</strong>. Trade slowed and shelters opened.`,'⚑');renderPanel()};$('#make-peace').onclick=()=>{const cost=state.completed.includes('diplomacy')?100:300;if(state.treasury<cost){api.toast(`Peace talks need ${cost} credits.`);return}state.treasury-=cost;state.conflict.active=false;state.conflict.tension=10;state.conflict.peace=100;commit(`You negotiated <strong>peace with ${state.conflict.neighbor}</strong>. Rebuilding can begin.`,'♡');renderPanel()};$('#repair-region').onclick=()=>{const cost=Math.ceil(state.buildings.reduce((n,b)=>n+(100-b.integrity)*3,0));if(state.treasury<cost){api.toast(`Repairs need ${cost} credits.`);return}state.treasury-=cost;state.buildings.forEach(b=>b.integrity=100);commit(`Your crews repaired the region for <strong>${cost} credits</strong>.`);api.toast(cost?'The skyline is restored.':'All buildings are already in good condition.');renderPanel()};updateConflict();
+  } catch {}
+  function districtNames() {
+    const c = EARTH_BY_ID[countryId],
+      names = c.cities.map((h) => h.name);
+    return Array.from(
+      { length: 6 },
+      (_, i) =>
+        names[i] ||
+        `${names[0] || c.name} · ${["North", "South", "East", "West", "Central", "Outer"][i]} district`,
+    );
+  }
+  const powers = document.createElement("details");
+  powers.className = "divine-drawer";
+  powers.innerHTML =
+    "<summary><span>✧ Divine powers</span><small>Weather · lightning · blessings · create residents</small><b>⌄</b></summary>";
+  $(".god-panel").before(powers);
+  powers.append($(".god-panel"));
+  const root = document.createElement("section");
+  root.className = "city-command";
+  root.innerHTML = `<div class="city-header"><div><div class="eyebrow">FROM A LITTLE TOWN TO AN ENTIRE WORLD</div><h2>Build something bigger<span>.</span></h2></div><button id="city-guide" title="How to control your cities">? City guide</button></div><div class="city-metrics"><div><small>TREASURY</small><strong id="city-money"></strong></div><div><small>CITY POPULATION</small><strong id="city-population"></strong></div><div><small>PUBLIC HEALTH</small><strong id="city-health"></strong></div><div><small>HAPPINESS</small><strong id="city-happiness"></strong></div><div><small>CASH FLOW / MIN</small><strong id="city-income"></strong></div></div><nav class="city-tabs" aria-label="City management">${[
+    ["build", "▥", "Build"],
+    ["research", "⚗", "Research"],
+    ["hall", "⚙", "City Hall"],
+    ["pets", "♧", "Cats & dogs"],
+    ["conflict", "⚑", "Diplomacy"],
+  ]
+    .map(
+      ([id, icon, label]) =>
+        `<button data-city-section="${id}" aria-pressed="${id === "build"}" class="${id === "build" ? "active" : ""}">${icon} ${label}</button>`,
+    )
+    .join(
+      "",
+    )}</nav><div id="city-panel-body"></div><div class="city-bottom"><span id="city-status">Your next chapter starts with an empty plot.</span><button id="city-grant">✧ Grant 5,000 credits</button></div>`;
+  powers.before(root);
+  const tools = document.createElement("div");
+  tools.className = "city-map-toolbar";
+  tools.innerHTML =
+    '<div><button id="view-city" class="active" aria-pressed="true">▦ City region</button><button id="view-village" aria-pressed="false">⌂ Original town</button></div><span id="city-map-instruction">Click a building, person, or pet to inspect.</span>';
+  $(".map-top").after(tools);
+  const dialog = document.createElement("dialog");
+  dialog.id = "city-dialog";
+  dialog.innerHTML =
+    '<button class="close-dialog" aria-label="Close city details">×</button><div id="city-dialog-body"></div>';
+  document.body.append(dialog);
+  dialog.querySelector("button").onclick = () => dialog.close();
+  const money = (n) => Math.round(n).toLocaleString();
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ state, view, countryId }));
+      $("#city-status").dataset.saved = "true";
+    } catch {
+      api.toast("City autosave is unavailable in this browser.");
     }
   }
-  function blueprintDetail(){const b=BUILDINGS[blueprint];$('#blueprint-details').innerHTML=`<span>${b.icon} ${b.name}</span><span>${b.capacity?'+'+b.capacity+' citizens · ':''}${b.research?'+'+b.research+' lab capacity · ':''}${b.health?'+'+b.health+' public health · ':''}${b.happiness?'+'+b.happiness+' happiness · ':''}${b.income>=0?'+':''}${b.income} cr/min</span>${b.requires&&!state.completed.includes(b.requires)?`<strong>Unlock with ${RESEARCH[b.requires].name}</strong>`:''}`;}
-  function updateResearch(){if(!$('#active-project'))return;$('#active-project').innerHTML=state.activeResearch?`<div class="active-research"><div><span>⚗ ${RESEARCH[state.activeResearch].name}</span><b>${Math.floor(state.researchProgress)}%</b></div><progress max="100" value="${state.researchProgress}" aria-label="Research progress"></progress></div>`:'<div class="idle-research">No project running. Choose a discovery below to begin.</div>'}
-  function updateConflict(){if(!$('#defense-value'))return;$('#defense-value').textContent=cityStats(state).defense;$('#condition-value').textContent=Math.round(state.buildings.reduce((n,b)=>n+b.integrity,0)/state.buildings.length)+'%';$('#relations-value').textContent=Math.round(state.conflict.peace)+'%';}
-  function buildingDetail(id){const b=state.buildings.find(b=>b.id===id);if(!b)return;const t=BUILDINGS[b.type];$('#city-dialog-body').innerHTML=`<div class="eyebrow">${districtNames()[b.district]} · BUILDING ${b.id}</div><h2 class="city-dialog-title">${t.icon} ${t.name}</h2><div class="building-facts"><span>Level <b>${b.level}/5</b></span><span>Condition <b>${Math.round(b.integrity)}%</b></span><span>Income <b>${Math.round(t.income*b.level*b.integrity/100)} cr/min</b></span>${t.capacity?`<span>Housing capacity <b>${Math.round(t.capacity*b.level*b.integrity/100)}</b></span>`:''}${t.research?`<span>Research capacity <b>${(t.research*b.level*b.integrity/100).toFixed(1)}</b></span>`:''}</div><p class="city-footnote">Upgrades improve this building’s output and restore its condition. Maximum level: 5.</p><button id="upgrade-building" class="primary-button" ${b.level>=5?'disabled':''}>Upgrade · ${Math.round(t.cost*b.level*.6*(state.completed.includes('engineering')?.75:1))} cr</button>`;$('#upgrade-building').onclick=()=>result(upgrade(state,id),()=>{commit(`You upgraded <strong>${t.name}</strong> in ${districtNames()[b.district]} to level ${b.level}.`);buildingDetail(id)});if(!dialog.open)dialog.showModal()}
-  function petDetail(id){const p=state.pets.find(p=>p.id===id);if(!p)return;$('#city-dialog-body').innerHTML=`<div class="eyebrow">A LITTLE LIFE IN YOUR CITY</div><h2 class="city-dialog-title">${escapeHTML(p.name)}</h2><p class="section-description">${p.type==='cat'?'A curious cat who patrols the windowsills.':'A friendly dog who knows every sidewalk.'}</p><div class="building-facts"><span>Home <b>${districtNames()[p.district]}</b></span><span>Health <b>${Math.round(p.health)}%</b></span><span>Species <b>${p.type}</b></span></div><button id="care-pet" class="primary-button">♡ Feed & care</button>`;$('#care-pet').onclick=()=>{p.health=100;save();petDetail(id);api.toast(`${p.name} is happy and healthy.`)};if(!dialog.open)dialog.showModal()}
-  function refresh(){const stats=cityStats(state);$('#city-money').textContent=money(state.treasury)+' cr';$('#city-population').textContent=money(stats.population);$('#city-health').textContent=Math.round(stats.health)+'%';$('#city-happiness').textContent=Math.round(stats.happiness)+'%';$('#city-income').textContent=(stats.income>=0?'+':'')+money(stats.income)+' cr';$('#city-income').className=stats.income>=0?'positive':'negative';$('#city-status').textContent=state.activeResearch?`Researching ${RESEARCH[state.activeResearch].name} · ${Math.floor(state.researchProgress)}%`:state.conflict.active?`⚑ Conflict with ${state.conflict.neighbor}. Your city needs you.`:`${state.districts.length} cities · ${state.pets.length} companions · autosave on`;updateResearch();updateConflict()}
-  function tick(dt){for(const event of advanceCity(state,dt)){if(event.type==='research'){commit(`<strong>${RESEARCH[event.id].name}</strong> research is complete. New upgrades are unlocked.`,'⚗');api.toast(`Discovery complete: ${RESEARCH[event.id].name}`);if(section==='research'||section==='build')renderPanel();if(['medicine','oncology'].includes(event.id))api.people.forEach(p=>{affectResident(p,{health:8});api.remember(p,`The city completed ${RESEARCH[event.id].name.toLowerCase()} research. Healthcare improved.`)})}}if(state.elapsed-lastSave>8){lastSave=state.elapsed;save()}if(state.elapsed-lastUI>.5){lastUI=state.elapsed;refresh()}}
-  function petPosition(p){const k=state.elapsed*.18+p.id*1.7;return {x:p.district%3*300+70+(Math.sin(k)*.5+.5)*150,y:Math.floor(p.district/3)*250+135+Math.cos(k*.8)*13}}
-  function residentPosition(p){const district=state.districts[p.id%state.districts.length];return{x:district%3*300+38+(p.x/900)*220,y:Math.floor(district/3)*250+40+(p.y/500)*170}}
-  function mapClick(x,y){if(view!=='city')return false;if(x<0||x>=900||y<0||y>=500)return true;
-    const district=Math.floor(y/250)*3+Math.floor(x/300);
-    if(mode==='build'){if(!state.districts.includes(district)){api.toast('Expand the region before building here.');return true}const slots=Array.from({length:6},(_,slot)=>({slot,...slotPosition(district,slot)}));const plot=slots.reduce((a,b)=>Math.hypot(b.x-x,b.y-y)<Math.hypot(a.x-x,a.y-y)?b:a);if(Math.hypot(plot.x-x,plot.y-y)>55){api.toast('Click an empty + plot inside a city.');return true}result(construct(state,blueprint,district,plot.slot),r=>{commit(`A new <strong>${BUILDINGS[r.building.type].name}</strong> opened in ${districtNames()[district]}.`);api.toast(`${BUILDINGS[r.building.type].name} built. Click more empty plots to keep building.`);if(section==='build')renderPanel()});return true}
-    if(!state.districts.includes(district)){api.toast(`${districtNames()[district]} is unclaimed. Use Expand region to connect it.`);return true}
-    const pet=state.pets.find(p=>{const pos=petPosition(p);return Math.hypot(x-pos.x,y-pos.y)<12});if(pet){petDetail(pet.id);return true}
-    const person=api.people.find(p=>{const pos=residentPosition(p);return Math.hypot(x-pos.x,y-pos.y)<11});if(person){api.openResident(person.id);return true}
-    const building=state.buildings.find(b=>{const pos=slotPosition(b.district,b.slot);return x>pos.x-31&&x<pos.x+31&&y>pos.y-85&&y<pos.y+20});if(building){buildingDetail(building.id);return true}api.toast(`${districtNames()[district]} · ${state.buildings.filter(b=>b.district===district).length}/6 plots. Choose a blueprint to build here.`);return true
+  function commit(message, icon = "▥") {
+    if (message) api.log(message, icon);
+    refresh();
+    save();
   }
-  function render(ctx,t){if(view!=='city')return false;paintTime=t;const fill=(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h)};fill(0,0,900,500,'#91afa1');
-    for(let d=0;d<6;d++){let dx=d%3*300,dy=Math.floor(d/3)*250,open=state.districts.includes(d);fill(dx+5,dy+5,290,240,open?(d===selectedDistrict?'#b7c89b':'#a9bc98'):'#647f78');fill(dx,dy,300,12,'#5e7770');fill(dx,dy,12,250,'#5e7770');fill(dx,dy+125,300,20,open?'#8a9382':'#617972');for(let lane=0;lane<8;lane++)fill(dx+lane*40+8,dy+133,16,1,'#dfdbc0');ctx.font='bold 9px sans-serif';ctx.textAlign='left';ctx.fillStyle=open?'#3e5e4c':'#c2d2be';ctx.fillText((open?'':'◇ ')+districtNames()[d].toUpperCase(),dx+22,dy+31);if(!open){ctx.fillStyle='#9db2a4';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText('UNCLAIMED CITY',dx+155,dy+115);ctx.font='8px sans-serif';ctx.fillText('Expand your region to build here',dx+155,dy+133);continue}
-      for(let slot=0;slot<6;slot++){const p=slotPosition(d,slot),b=state.buildings.find(b=>b.district===d&&b.slot===slot);if(!b){fill(p.x-30,p.y-40,60,61,mode==='build'?'#d1d9ab':'#b4c49e');ctx.strokeStyle=mode==='build'?'#f4f0c9':'#8ca684';ctx.setLineDash([3,3]);ctx.strokeRect(p.x-29,p.y-39,58,59);ctx.setLineDash([]);ctx.font='18px sans-serif';ctx.fillStyle=mode==='build'?'#57784a':'#8ba17e';ctx.textAlign='center';ctx.fillText('+',p.x,p.y-7)}else drawBuilding(ctx,b,p,fill)}
-      for(let i=0;i<4;i++){let x=dx+20+i*83;fill(x,dy+150,3,10,'#7d7954');ctx.fillStyle='#73956c';ctx.beginPath();ctx.arc(x+2,dy+147,8,0,7);ctx.fill()}
+  function result(r, onSuccess) {
+    if (r.error) {
+      api.toast(r.error);
+      return false;
+    }
+    onSuccess(r);
+    return true;
+  }
+  function setView(value) {
+    api.onView?.();
+    view = value;
+    mode = "inspect";
+    api.resetZoom();
+    $("#view-city").classList.toggle("active", view === "city");
+    $("#view-village").classList.toggle("active", view === "village");
+    $("#view-city").setAttribute("aria-pressed", String(view === "city"));
+    $("#view-village").setAttribute("aria-pressed", String(view === "village"));
+    $(".town-title").innerHTML =
+      '<span class="live-dot"></span> ' +
+      (view === "city"
+        ? EARTH_BY_ID[countryId].name.toUpperCase() + " · CITY REGION"
+        : "WILLOWBROOK");
+    $("#canvas-wrap").classList.toggle("city-view", view === "city");
+    $(".map-note").innerHTML =
+      "<span>↖</span> " +
+      (view === "city"
+        ? "Click buildings, residents, cats & dogs"
+        : "Click a resident to meet them");
+    $("#city-map-instruction").textContent =
+      view === "city"
+        ? "Click a building, person, or pet to inspect."
+        : "Your original town and all its memories.";
+    $("#city-map-instruction").classList.remove("placing");
+    $("#world").setAttribute(
+      "aria-label",
+      view === "city"
+        ? "Interactive region of six cities. Build on empty plots or inspect buildings, pets, and residents."
+        : "Interactive map of Willowbrook. Inspect residents on the map or in the Residents panel.",
+    );
+    save();
+  }
+  function showSection(value) {
+    section = value;
+    document.querySelectorAll("[data-city-section]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.citySection === value);
+      b.setAttribute("aria-pressed", String(b.dataset.citySection === value));
+    });
+    renderPanel();
+  }
+  function armBuild() {
+    if (view !== "city") setView("city");
+    api.inspectPower();
+    mode = "build";
+    $("#city-map-instruction").textContent =
+      `BUILD ${BUILDINGS[blueprint].name.toUpperCase()} · Click an empty + plot`;
+    $("#city-map-instruction").classList.add("placing");
+    api.toast(
+      `Choose an empty plot to build ${BUILDINGS[blueprint].name.toLowerCase()}.`,
+    );
+    $(".map-card").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function renderPanel() {
+    const body = $("#city-panel-body");
+    if (section === "build") {
+      body.innerHTML = `<div class="build-heading"><div><strong>${state.districts.length} connected cities · ${state.buildings.length} buildings</strong><p>Start with a plot. Grow into a skyline.</p></div><button id="expand-region" class="primary-button" ${state.districts.length >= 6 ? "disabled" : ""}>+ ${state.districts.length >= 6 ? "All cities connected" : `Expand region · ${money(expansionCost(state))} cr`}</button></div><div class="construction-row"><label>Building blueprint<select id="building-blueprint" aria-label="Building blueprint">${Object.entries(
+        BUILDINGS,
+      )
+        .map(
+          ([id, b]) =>
+            `<option value="${id}" ${id === blueprint ? "selected" : ""}>${b.icon} ${b.name} · ${money(b.cost)} cr${b.requires && !state.completed.includes(b.requires) ? " · Research required" : ""}</option>`,
+        )
+        .join(
+          "",
+        )}</select></label><button id="arm-building" class="primary-button">Build on the map ↗</button><button id="inspect-city" class="secondary-button">Inspect</button></div><div id="blueprint-details"></div><div class="district-list">${districtNames()
+        .map(
+          (name, i) =>
+            `<button data-district="${i}" class="${state.districts.includes(i) ? "available" : "locked"} ${selectedDistrict === i ? "selected" : ""}"><span>${state.districts.includes(i) ? "▦" : "◇"}</span>${escapeHTML(name)}<small>${state.districts.includes(i) ? state.buildings.filter((b) => b.district === i).length + "/6 plots" : "Unclaimed"}</small></button>`,
+        )
+        .join("")}</div>`;
+      $("#building-blueprint").onchange = (e) => {
+        blueprint = e.target.value;
+        blueprintDetail();
+      };
+      $("#arm-building").onclick = armBuild;
+      $("#inspect-city").onclick = () => {
+        mode = "inspect";
+        api.inspectPower();
+        $("#city-map-instruction").textContent =
+          "Click a building, person, or pet to inspect.";
+        $("#city-map-instruction").classList.remove("placing");
+      };
+      $("#expand-region").onclick = () =>
+        result(expand(state), (r) => {
+          selectedDistrict = r.district;
+          setView("city");
+          commit(
+            `<strong>${districtNames()[r.district]}</strong> joined your region. Six new plots are ready.`,
+          );
+          api.toast(
+            `Welcome to ${districtNames()[r.district]}. Your world just got bigger.`,
+          );
+          renderPanel();
+        });
+      body.querySelectorAll("[data-district]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            const id = +b.dataset.district;
+            if (!state.districts.includes(id)) {
+              api.toast("Use Expand region to connect the next city.");
+              return;
+            }
+            selectedDistrict = id;
+            setView("city");
+            renderPanel();
+            api.toast(`${districtNames()[id]} is highlighted on the map.`);
+          }),
+      );
+      blueprintDetail();
+    }
+    if (section === "research") {
+      const stats = cityStats(state);
+      body.innerHTML = `<div class="research-overview"><div><strong>Ideas today. A different world tomorrow.</strong><p>${stats.labs.toFixed(1)} lab capacity · ${state.completed.length}/${Object.keys(RESEARCH).length} discoveries · ${state.researchFunding}% funding</p></div><span class="simulation-tag">FICTIONAL GAME RESEARCH</span></div><div id="active-project"></div><div class="research-grid">${Object.entries(
+        RESEARCH,
+      )
+        .map(([id, r]) => {
+          let done = state.completed.includes(id),
+            locked = r.requires && !state.completed.includes(r.requires);
+          return `<article class="research-project ${done ? "complete" : ""}"><div><span>${r.icon} ${r.field}</span><b>${done ? "✓ DISCOVERED" : money(r.cost) + " CR"}</b></div><h3>${r.name}</h3><p>${r.description}</p><small>${r.unlocks}</small><button data-research="${id}" ${done || locked || state.activeResearch ? "disabled" : ""}>${done ? "Completed" : state.activeResearch === id ? "Researching…" : locked ? "Requires " + RESEARCH[r.requires].name : "Fund research · " + r.duration + "s"}</button></article>`;
+        })
+        .join(
+          "",
+        )}</div><p class="city-footnote">Research produces game upgrades, not real scientific findings. Use time controls to speed progress. More labs, education, and research funding increase the rate.</p>`;
+      body.querySelectorAll("[data-research]").forEach(
+        (b) =>
+          (b.onclick = () =>
+            result(beginResearch(state, b.dataset.research), (r) => {
+              commit(
+                `You funded <strong>${r.project.name}</strong>. Your labs are getting to work.`,
+                "⚗",
+              );
+              renderPanel();
+            })),
+      );
+      updateResearch();
+    }
+    if (section === "hall") {
+      body.innerHTML = `<div class="research-overview"><div><strong>Your city. Your priorities.</strong><p>Balance income, public services, and long-term discoveries.</p></div><span class="simulation-tag">LIVE CITY POLICIES</span></div><div class="policy-grid">${[
+        [
+          "tax",
+          "Tax rate",
+          25,
+          "%",
+          "Higher taxes raise revenue but reduce happiness.",
+        ],
+        [
+          "healthFunding",
+          "Healthcare funding",
+          100,
+          "%",
+          "Public healthcare improves the region’s health.",
+        ],
+        [
+          "researchFunding",
+          "Research funding",
+          100,
+          "%",
+          "More funding means faster discoveries and higher costs.",
+        ],
+        [
+          "trafficDensity",
+          "Traffic density",
+          100,
+          "%",
+          "Set street traffic from car-free to a busy city. Transit research adds buses.",
+        ],
+      ]
+        .map(
+          ([key, name, max, unit, desc]) =>
+            `<label>${name}<strong id="policy-${key}">${state[key]}${unit}</strong><input type="range" id="input-${key}" data-policy="${key}" aria-label="${name}" min="0" max="${max}" value="${state[key]}"><small>${desc}</small></label>`,
+        )
+        .join(
+          "",
+        )}</div><div class="city-help-note">Income is collected as simulation time passes. Apartments bring citizens; shops and offices create income; parks raise happiness; clinics and hospitals support health. Building upgrades multiply their effects.</div>`;
+      body.querySelectorAll("[data-policy]").forEach((input) => {
+        input.oninput = (e) => {
+          state[input.dataset.policy] = +e.target.value;
+          $("#policy-" + input.dataset.policy).textContent =
+            e.target.value + "%";
+          refresh();
+        };
+        input.onchange = () => commit("You adjusted the city budget.", "⚙");
+      });
+    }
+    if (section === "pets") {
+      body.innerHTML = `<div class="research-overview"><div><strong>A city feels like home with a few more paws.</strong><p>${state.pets.length} cats & dogs wander your neighborhoods.</p></div><span class="simulation-tag">CLICK PETS ON THE MAP</span></div><form id="pet-form" class="pet-form"><label>Pet’s name<input name="name" required maxlength="24" placeholder="e.g. Mochi"></label><label>Companion<select name="type" aria-label="Pet type"><option value="cat">Cat</option><option value="dog">Dog</option></select></label><button class="primary-button" type="submit">Adopt · 50 cr</button></form><div class="pet-roster">${state.pets.map((p) => `<button data-pet="${p.id}"><span>${p.type === "cat" ? "♧" : "♧"}</span><strong>${escapeHTML(p.name)}</strong><small>${p.type} · ${Math.round(p.health)}% health · ${districtNames()[p.district]}</small><b>↗</b></button>`).join("")}</div><p class="city-footnote">Cats and dogs have their own health and move around their home city. Veterinary care improves their health over time.</p>`;
+      $("#pet-form").onsubmit = (e) => {
+        e.preventDefault();
+        if (state.pets.length >= 40) {
+          api.toast("This region has room for 40 companions.");
+          return;
+        }
+        if (state.treasury < 50) {
+          api.toast("Adoption needs 50 credits.");
+          return;
+        }
+        const data = new FormData(e.target),
+          name = data.get("name").trim();
+        if (!name) return;
+        state.treasury -= 50;
+        state.pets.push({
+          id: Math.max(0, ...state.pets.map((p) => p.id)) + 1,
+          type: data.get("type"),
+          name,
+          health: 100,
+          district: selectedDistrict,
+        });
+        commit(
+          `<strong>${escapeHTML(name)}</strong> found a home in ${districtNames()[selectedDistrict]}.`,
+          "♡",
+        );
+        renderPanel();
+      };
+      body
+        .querySelectorAll("[data-pet]")
+        .forEach((b) => (b.onclick = () => petDetail(+b.dataset.pet)));
+    }
+    if (section === "conflict") {
+      body.innerHTML = `<div class="research-overview"><div><strong>Power comes with consequences.</strong><p>Manage fictional rivals, defend your people, or choose peace.</p></div><span class="conflict-badge ${state.conflict.active ? "war" : ""}">${state.conflict.active ? "CONFLICT ACTIVE" : "AT PEACE"}</span></div><div class="diplomacy-layout"><div><label class="neighbor-label">Neighboring state<select id="neighbor" aria-label="Neighboring state">${["Ironvale", "Redhaven", "Stonewatch"].map((n) => `<option ${n === state.conflict.neighbor ? "selected" : ""}>${n}</option>`).join("")}</select></label><p class="city-footnote">Conflict reduces income and happiness and gradually damages buildings. Shelters, resilience research, and defense HQs reduce damage. No side automatically wins.</p><div class="diplomacy-buttons"><button id="declare-conflict" class="danger-button" ${state.conflict.active ? "disabled" : ""}>⚑ Declare conflict</button><button id="make-peace" class="primary-button" ${!state.conflict.active ? "disabled" : ""}>Negotiate peace · ${state.completed.includes("diplomacy") ? 100 : 300} cr</button></div></div><div class="conflict-numbers"><span>Defense <b id="defense-value"></b></span><span>Building condition <b id="condition-value"></b></span><span>Relations <b id="relations-value"></b></span><button id="repair-region" class="secondary-button">Repair the region</button></div></div>`;
+      $("#neighbor").disabled = state.conflict.active;
+      $("#neighbor").onchange = (e) => {
+        state.conflict.neighbor = e.target.value;
+        save();
+      };
+      $("#declare-conflict").onclick = () => {
+        state.conflict.active = true;
+        state.conflict.tension = 70;
+        api.people.forEach((p) => {
+          affectResident(p, { social: -10 });
+          api.remember(
+            p,
+            `Conflict broke out with ${state.conflict.neighbor}. Worried about the city.`,
+          );
+        });
+        commit(
+          `Conflict began with <strong>${state.conflict.neighbor}</strong>. Trade slowed and shelters opened.`,
+          "⚑",
+        );
+        renderPanel();
+      };
+      $("#make-peace").onclick = () => {
+        const cost = state.completed.includes("diplomacy") ? 100 : 300;
+        if (state.treasury < cost) {
+          api.toast(`Peace talks need ${cost} credits.`);
+          return;
+        }
+        state.treasury -= cost;
+        state.conflict.active = false;
+        state.conflict.tension = 10;
+        state.conflict.peace = 100;
+        commit(
+          `You negotiated <strong>peace with ${state.conflict.neighbor}</strong>. Rebuilding can begin.`,
+          "♡",
+        );
+        renderPanel();
+      };
+      $("#repair-region").onclick = () => {
+        const cost = Math.ceil(
+          state.buildings.reduce((n, b) => n + (100 - b.integrity) * 3, 0),
+        );
+        if (state.treasury < cost) {
+          api.toast(`Repairs need ${cost} credits.`);
+          return;
+        }
+        state.treasury -= cost;
+        state.buildings.forEach((b) => (b.integrity = 100));
+        commit(
+          `Your crews repaired the region for <strong>${cost} credits</strong>.`,
+        );
+        api.toast(
+          cost
+            ? "The skyline is restored."
+            : "All buildings are already in good condition.",
+        );
+        renderPanel();
+      };
+      updateConflict();
+    }
+  }
+  function blueprintDetail() {
+    const b = BUILDINGS[blueprint];
+    $("#blueprint-details").innerHTML =
+      `<span>${b.icon} ${b.name}</span><span>${b.capacity ? "+" + b.capacity + " citizens · " : ""}${b.research ? "+" + b.research + " lab capacity · " : ""}${b.health ? "+" + b.health + " public health · " : ""}${b.happiness ? "+" + b.happiness + " happiness · " : ""}${b.income >= 0 ? "+" : ""}${b.income} cr/min</span>${b.requires && !state.completed.includes(b.requires) ? `<strong>Unlock with ${RESEARCH[b.requires].name}</strong>` : ""}`;
+  }
+  function updateResearch() {
+    if (!$("#active-project")) return;
+    $("#active-project").innerHTML = state.activeResearch
+      ? `<div class="active-research"><div><span>⚗ ${RESEARCH[state.activeResearch].name}</span><b>${Math.floor(state.researchProgress)}%</b></div><progress max="100" value="${state.researchProgress}" aria-label="Research progress"></progress></div>`
+      : '<div class="idle-research">No project running. Choose a discovery below to begin.</div>';
+  }
+  function updateConflict() {
+    if (!$("#defense-value")) return;
+    $("#defense-value").textContent = cityStats(state).defense;
+    $("#condition-value").textContent =
+      Math.round(
+        state.buildings.reduce((n, b) => n + b.integrity, 0) /
+          state.buildings.length,
+      ) + "%";
+    $("#relations-value").textContent = Math.round(state.conflict.peace) + "%";
+  }
+  function buildingDetail(id) {
+    const b = state.buildings.find((b) => b.id === id);
+    if (!b) return;
+    const t = BUILDINGS[b.type];
+    $("#city-dialog-body").innerHTML =
+      `<div class="eyebrow">${districtNames()[b.district]} · BUILDING ${b.id}</div><h2 class="city-dialog-title">${t.icon} ${t.name}</h2><div class="building-facts"><span>Level <b>${b.level}/5</b></span><span>Condition <b>${Math.round(b.integrity)}%</b></span><span>Income <b>${Math.round((t.income * b.level * b.integrity) / 100)} cr/min</b></span>${t.capacity ? `<span>Housing capacity <b>${Math.round((t.capacity * b.level * b.integrity) / 100)}</b></span>` : ""}${t.research ? `<span>Research capacity <b>${((t.research * b.level * b.integrity) / 100).toFixed(1)}</b></span>` : ""}</div><p class="city-footnote">Upgrades improve this building’s output and restore its condition. Maximum level: 5.</p><button id="upgrade-building" class="primary-button" ${b.level >= 5 ? "disabled" : ""}>Upgrade · ${Math.round(t.cost * b.level * 0.6 * (state.completed.includes("engineering") ? 0.75 : 1))} cr</button>`;
+    $("#upgrade-building").onclick = () =>
+      result(upgrade(state, id), () => {
+        commit(
+          `You upgraded <strong>${t.name}</strong> in ${districtNames()[b.district]} to level ${b.level}.`,
+        );
+        buildingDetail(id);
+      });
+    if (!dialog.open) dialog.showModal();
+  }
+  function petDetail(id) {
+    const p = state.pets.find((p) => p.id === id);
+    if (!p) return;
+    $("#city-dialog-body").innerHTML =
+      `<div class="eyebrow">A LITTLE LIFE IN YOUR CITY</div><h2 class="city-dialog-title">${escapeHTML(p.name)}</h2><p class="section-description">${p.type === "cat" ? "A curious cat who patrols the windowsills." : "A friendly dog who knows every sidewalk."}</p><div class="building-facts"><span>Home <b>${districtNames()[p.district]}</b></span><span>Health <b>${Math.round(p.health)}%</b></span><span>Species <b>${p.type}</b></span></div><button id="care-pet" class="primary-button">♡ Feed & care</button>`;
+    $("#care-pet").onclick = () => {
+      p.health = 100;
+      save();
+      petDetail(id);
+      api.toast(`${p.name} is happy and healthy.`);
+    };
+    if (!dialog.open) dialog.showModal();
+  }
+  function refresh() {
+    const stats = cityStats(state);
+    $("#city-money").textContent = money(state.treasury) + " cr";
+    $("#city-population").textContent = money(stats.population);
+    $("#city-health").textContent = Math.round(stats.health) + "%";
+    $("#city-happiness").textContent = Math.round(stats.happiness) + "%";
+    $("#city-income").textContent =
+      (stats.income >= 0 ? "+" : "") + money(stats.income) + " cr";
+    $("#city-income").className = stats.income >= 0 ? "positive" : "negative";
+    $("#city-status").textContent = state.activeResearch
+      ? `Researching ${RESEARCH[state.activeResearch].name} · ${Math.floor(state.researchProgress)}%`
+      : state.conflict.active
+        ? `⚑ Conflict with ${state.conflict.neighbor}. Your city needs you.`
+        : `${state.districts.length} cities · ${state.pets.length} companions · autosave on`;
+    updateResearch();
+    updateConflict();
+  }
+  function tick(dt) {
+    for (const event of advanceCity(state, dt)) {
+      if (event.type === "research") {
+        commit(
+          `<strong>${RESEARCH[event.id].name}</strong> research is complete. New upgrades are unlocked.`,
+          "⚗",
+        );
+        api.toast(`Discovery complete: ${RESEARCH[event.id].name}`);
+        if (section === "research" || section === "build") renderPanel();
+        if (["medicine", "oncology"].includes(event.id))
+          api.people.forEach((p) => {
+            affectResident(p, { health: 8 });
+            api.remember(
+              p,
+              `The city completed ${RESEARCH[event.id].name.toLowerCase()} research. Healthcare improved.`,
+            );
+          });
+      }
+    }
+    if (state.elapsed - lastSave > 8) {
+      lastSave = state.elapsed;
+      save();
+    }
+    if (state.elapsed - lastUI > 0.5) {
+      lastUI = state.elapsed;
+      refresh();
+    }
+  }
+  function petPosition(p) {
+    const k = state.elapsed * 0.18 + p.id * 1.7;
+    return {
+      x: (p.district % 3) * 300 + 70 + (Math.sin(k) * 0.5 + 0.5) * 150,
+      y: Math.floor(p.district / 3) * 250 + 135 + Math.cos(k * 0.8) * 13,
+    };
+  }
+  function residentPosition(p) {
+    const district = state.districts[p.id % state.districts.length];
+    return {
+      x: (district % 3) * 300 + 38 + (p.x / 900) * 220,
+      y: Math.floor(district / 3) * 250 + 40 + (p.y / 500) * 170,
+    };
+  }
+  function mapClick(x, y) {
+    if (view !== "city") return false;
+    if (x < 0 || x >= 900 || y < 0 || y >= 500) return true;
+    const district = Math.floor(y / 250) * 3 + Math.floor(x / 300);
+    if (mode === "build") {
+      if (!state.districts.includes(district)) {
+        api.toast("Expand the region before building here.");
+        return true;
+      }
+      const slots = Array.from({ length: 6 }, (_, slot) => ({
+        slot,
+        ...slotPosition(district, slot),
+      }));
+      const plot = slots.reduce((a, b) =>
+        Math.hypot(b.x - x, b.y - y) < Math.hypot(a.x - x, a.y - y) ? b : a,
+      );
+      if (Math.hypot(plot.x - x, plot.y - y) > 55) {
+        api.toast("Click an empty + plot inside a city.");
+        return true;
+      }
+      result(construct(state, blueprint, district, plot.slot), (r) => {
+        commit(
+          `A new <strong>${BUILDINGS[r.building.type].name}</strong> opened in ${districtNames()[district]}.`,
+        );
+        api.toast(
+          `${BUILDINGS[r.building.type].name} built. Click more empty plots to keep building.`,
+        );
+        if (section === "build") renderPanel();
+      });
+      return true;
+    }
+    if (!state.districts.includes(district)) {
+      api.toast(
+        `${districtNames()[district]} is unclaimed. Use Expand region to connect it.`,
+      );
+      return true;
+    }
+    const pet = state.pets.find((p) => {
+      const pos = petPosition(p);
+      return Math.hypot(x - pos.x, y - pos.y) < 12;
+    });
+    if (pet) {
+      petDetail(pet.id);
+      return true;
+    }
+    const person = api.people.find((p) => {
+      const pos = residentPosition(p);
+      return Math.hypot(x - pos.x, y - pos.y) < 11;
+    });
+    if (person) {
+      api.openResident(person.id);
+      return true;
+    }
+    const building = state.buildings.find((b) => {
+      const pos = slotPosition(b.district, b.slot);
+      return (
+        x > pos.x - 31 && x < pos.x + 31 && y > pos.y - 85 && y < pos.y + 20
+      );
+    });
+    if (building) {
+      buildingDetail(building.id);
+      return true;
+    }
+    api.toast(
+      `${districtNames()[district]} · ${state.buildings.filter((b) => b.district === district).length}/6 plots. Choose a blueprint to build here.`,
+    );
+    return true;
+  }
+  function render(ctx, t) {
+    if (view !== "city") return false;
+    paintTime = t;
+    const fill = (x, y, w, h, c) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(Math.round(x), Math.round(y), w, h);
+    };
+    fill(0, 0, 900, 500, "#91afa1");
+    for (let d = 0; d < 6; d++) {
+      let dx = (d % 3) * 300,
+        dy = Math.floor(d / 3) * 250,
+        open = state.districts.includes(d);
+      fill(
+        dx + 5,
+        dy + 5,
+        290,
+        240,
+        open ? (d === selectedDistrict ? "#b7c89b" : "#a9bc98") : "#647f78",
+      );
+      fill(dx, dy, 300, 12, "#5e7770");
+      fill(dx, dy, 12, 250, "#5e7770");
+      fill(dx, dy + 125, 300, 20, open ? "#8a9382" : "#617972");
+      for (let lane = 0; lane < 8; lane++)
+        fill(dx + lane * 40 + 8, dy + 133, 16, 1, "#dfdbc0");
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillStyle = open ? "#3e5e4c" : "#c2d2be";
+      ctx.fillText(
+        (open ? "" : "◇ ") + districtNames()[d].toUpperCase(),
+        dx + 22,
+        dy + 31,
+      );
+      if (!open) {
+        ctx.fillStyle = "#9db2a4";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("UNCLAIMED CITY", dx + 155, dy + 115);
+        ctx.font = "8px sans-serif";
+        ctx.fillText("Expand your region to build here", dx + 155, dy + 133);
+        continue;
+      }
+      for (let slot = 0; slot < 6; slot++) {
+        const p = slotPosition(d, slot),
+          b = state.buildings.find((b) => b.district === d && b.slot === slot);
+        if (!b) {
+          fill(
+            p.x - 30,
+            p.y - 40,
+            60,
+            61,
+            mode === "build" ? "#d1d9ab" : "#b4c49e",
+          );
+          ctx.strokeStyle = mode === "build" ? "#f4f0c9" : "#8ca684";
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(p.x - 29, p.y - 39, 58, 59);
+          ctx.setLineDash([]);
+          ctx.font = "18px sans-serif";
+          ctx.fillStyle = mode === "build" ? "#57784a" : "#8ba17e";
+          ctx.textAlign = "center";
+          ctx.fillText("+", p.x, p.y - 7);
+        } else drawBuilding(ctx, b, p, fill);
+      }
+      for (let i = 0; i < 4; i++) {
+        let x = dx + 20 + i * 83;
+        fill(x, dy + 150, 3, 10, "#7d7954");
+        ctx.fillStyle = "#73956c";
+        ctx.beginPath();
+        ctx.arc(x + 2, dy + 147, 8, 0, 7);
+        ctx.fill();
+      }
     }
     // Road traffic is tied to simulation time, so pause and speed controls affect it.
-    for(let i=0;i<Math.round(state.districts.length*state.trafficDensity/11);i++){const d=state.districts[i%state.districts.length],x=d%3*300+(state.elapsed*(i%2?-16:13)+i*63+30000)%270+15,y=Math.floor(d/3)*250+130+(i%2)*8;const electric=state.completed.includes('electric');fill(x,y,i%4===0&&state.completed.includes('transit')?25:14,6,electric?'#83d4b0':['#d8c17b','#c98070','#e5e2cb','#7e9ead'][i%4]);fill(x+3,y,5,2,'#bdd5d2');fill(x+2,y+5,3,2,'#46594e');fill(x+10,y+5,3,2,'#46594e')}
+    for (
+      let i = 0;
+      i < Math.round((state.districts.length * state.trafficDensity) / 11);
+      i++
+    ) {
+      const d = state.districts[i % state.districts.length],
+        x =
+          (d % 3) * 300 +
+          ((state.elapsed * (i % 2 ? -16 : 13) + i * 63 + 30000) % 270) +
+          15,
+        y = Math.floor(d / 3) * 250 + 130 + (i % 2) * 8;
+      const electric = state.completed.includes("electric");
+      fill(
+        x,
+        y,
+        i % 4 === 0 && state.completed.includes("transit") ? 25 : 14,
+        6,
+        electric
+          ? "#83d4b0"
+          : ["#d8c17b", "#c98070", "#e5e2cb", "#7e9ead"][i % 4],
+      );
+      fill(x + 3, y, 5, 2, "#bdd5d2");
+      fill(x + 2, y + 5, 3, 2, "#46594e");
+      fill(x + 10, y + 5, 3, 2, "#46594e");
+    }
     // Ambient city pedestrians represent the aggregate population; named residents remain inspectable.
-    for(let i=0;i<Math.min(55,Math.floor(cityStats(state).population/7));i++){const d=state.districts[i%state.districts.length],x=d%3*300+28+(state.elapsed*(i%2?3:-3)+i*41+30000)%245,y=Math.floor(d/3)*250+151+i%3*3;fill(x,y-5,3,5,['#ba8975','#859dab','#b7ab78'][i%3]);fill(x,y-8,3,3,'#d4b392')}
-    api.people.forEach(p=>{const pos=residentPosition(p);fill(pos.x-3,pos.y-8,6,8,p.color);fill(pos.x-3,pos.y-15,6,6,p.skin);fill(pos.x-3,pos.y-16,6,3,p.hair);fill(pos.x-3,pos.y,2,3,'#425248');fill(pos.x+1,pos.y,2,3,'#425248')});
-    state.pets.forEach(p=>{const pos=petPosition(p),c=p.type==='cat'?'#d6b577':'#b58360';fill(pos.x-5,pos.y-4,10,5,c);fill(pos.x+3,pos.y-7,5,5,c);fill(pos.x-5,pos.y,2,3,'#785a43');fill(pos.x+2,pos.y,2,3,'#785a43');fill(pos.x-8,pos.y-6,4,2,c);if(p.type==='cat'){fill(pos.x+3,pos.y-9,2,3,c);fill(pos.x+6,pos.y-9,2,3,c)}else fill(pos.x+6,pos.y-5,3,4,'#735640');fill(pos.x+6,pos.y-6,1,1,'#36453b')});
-    if(state.conflict.active){for(let i=0;i<5;i++){let x=(state.elapsed*8+i*161)%880,y=247+Math.sin(i)*4;fill(x,y,15,7,'#607968');fill(x+4,y-3,7,4,'#82917a');fill(x+10,y-2,11,2,'#495d4d')}ctx.fillStyle='#3d353320';ctx.fillRect(0,0,900,500);ctx.fillStyle='#f2d3a0';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText('⚑ CONFLICT WITH '+state.conflict.neighbor.toUpperCase()+' · PROTECT YOUR CITIES',450,20)}return true;
+    for (
+      let i = 0;
+      i < Math.min(55, Math.floor(cityStats(state).population / 7));
+      i++
+    ) {
+      const d = state.districts[i % state.districts.length],
+        x =
+          (d % 3) * 300 +
+          28 +
+          ((state.elapsed * (i % 2 ? 3 : -3) + i * 41 + 30000) % 245),
+        y = Math.floor(d / 3) * 250 + 151 + (i % 3) * 3;
+      fill(x, y - 5, 3, 5, ["#ba8975", "#859dab", "#b7ab78"][i % 3]);
+      fill(x, y - 8, 3, 3, "#d4b392");
+    }
+    api.people.forEach((p) => {
+      const pos = residentPosition(p);
+      fill(pos.x - 3, pos.y - 8, 6, 8, p.color);
+      fill(pos.x - 3, pos.y - 15, 6, 6, p.skin);
+      fill(pos.x - 3, pos.y - 16, 6, 3, p.hair);
+      fill(pos.x - 3, pos.y, 2, 3, "#425248");
+      fill(pos.x + 1, pos.y, 2, 3, "#425248");
+    });
+    state.pets.forEach((p) => {
+      const pos = petPosition(p),
+        c = p.type === "cat" ? "#d6b577" : "#b58360";
+      fill(pos.x - 5, pos.y - 4, 10, 5, c);
+      fill(pos.x + 3, pos.y - 7, 5, 5, c);
+      fill(pos.x - 5, pos.y, 2, 3, "#785a43");
+      fill(pos.x + 2, pos.y, 2, 3, "#785a43");
+      fill(pos.x - 8, pos.y - 6, 4, 2, c);
+      if (p.type === "cat") {
+        fill(pos.x + 3, pos.y - 9, 2, 3, c);
+        fill(pos.x + 6, pos.y - 9, 2, 3, c);
+      } else fill(pos.x + 6, pos.y - 5, 3, 4, "#735640");
+      fill(pos.x + 6, pos.y - 6, 1, 1, "#36453b");
+    });
+    if (state.conflict.active) {
+      for (let i = 0; i < 5; i++) {
+        let x = (state.elapsed * 8 + i * 161) % 880,
+          y = 247 + Math.sin(i) * 4;
+        fill(x, y, 15, 7, "#607968");
+        fill(x + 4, y - 3, 7, 4, "#82917a");
+        fill(x + 10, y - 2, 11, 2, "#495d4d");
+      }
+      ctx.fillStyle = "#3d353320";
+      ctx.fillRect(0, 0, 900, 500);
+      ctx.fillStyle = "#f2d3a0";
+      ctx.font = "bold 9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        "⚑ CONFLICT WITH " +
+          state.conflict.neighbor.toUpperCase() +
+          " · PROTECT YOUR CITIES",
+        450,
+        20,
+      );
+    }
+    return true;
   }
-  function drawBuilding(ctx,b,p,fill){const t=BUILDINGS[b.type];if(b.type==='park'){fill(p.x-24,p.y-33,48,47,'#8aaf75');for(let i=0;i<3;i++){fill(p.x-17+i*16,p.y-9,3,10,'#7b7650');ctx.fillStyle='#638e61';ctx.beginPath();ctx.arc(p.x-16+i*16,p.y-18,10,0,7);ctx.fill()}fill(p.x-24,p.y+4,48,4,'#d3cea1')}else if(b.type==='farm'||b.type==='solar'){fill(p.x-28,p.y-32,56,47,b.type==='farm'?'#a18f64':'#a8b7a1');for(let i=0;i<4;i++)for(let j=0;j<3;j++)fill(p.x-24+i*13,p.y-27+j*13,10,8,b.type==='farm'?(j%2?'#b8be6a':'#75975e'):'#587d91')}else{const floors=(b.type==='skyscraper'?8:b.type==='office'?5:b.type==='apartment'||b.type==='hospital'||b.type==='university'?3:1)+b.level-1,height=Math.min(82,20+floors*7);fill(p.x-24,p.y-height,48,height,t.color);fill(p.x+24,p.y-height,7,height,'#66827b');fill(p.x-26,p.y-height-5,53,6,b.type==='restaurant'?'#b37460':'#d2d3bb');for(let row=0;row<Math.min(floors,9);row++)for(let col=0;col<4;col++)fill(p.x-18+col*11,p.y-height+7+row*7,5,4,b.type==='lab'?'#9bd0c9':'#587d7f');fill(p.x-4,p.y-12,9,12,'#57736b');if(b.type==='hospital'||b.type==='clinic'){fill(p.x-4,p.y-height-13,9,3,'#b2756c');fill(p.x-1,p.y-height-16,3,9,'#b2756c')}if(b.type==='shop'||b.type==='restaurant')for(let i=0;i<6;i++)fill(p.x-26+i*9,p.y-height+12,9,7,i%2?'#efdeb1':'#a6775e')}
-    if(b.integrity<90){ctx.fillStyle='#514b4966';ctx.beginPath();ctx.arc(p.x+17,p.y-48+Math.sin(paintTime*.001)*4,7+(100-b.integrity)*.06,0,7);ctx.fill()}ctx.font='7px sans-serif';ctx.textAlign='center';ctx.fillStyle='#365547';ctx.fillText(t.name+(b.level>1?' L'+b.level:''),p.x,p.y+13)
+  function drawBuilding(ctx, b, p, fill) {
+    const t = BUILDINGS[b.type];
+    if (b.type === "park") {
+      fill(p.x - 24, p.y - 33, 48, 47, "#8aaf75");
+      for (let i = 0; i < 3; i++) {
+        fill(p.x - 17 + i * 16, p.y - 9, 3, 10, "#7b7650");
+        ctx.fillStyle = "#638e61";
+        ctx.beginPath();
+        ctx.arc(p.x - 16 + i * 16, p.y - 18, 10, 0, 7);
+        ctx.fill();
+      }
+      fill(p.x - 24, p.y + 4, 48, 4, "#d3cea1");
+    } else if (b.type === "farm" || b.type === "solar") {
+      fill(
+        p.x - 28,
+        p.y - 32,
+        56,
+        47,
+        b.type === "farm" ? "#a18f64" : "#a8b7a1",
+      );
+      for (let i = 0; i < 4; i++)
+        for (let j = 0; j < 3; j++)
+          fill(
+            p.x - 24 + i * 13,
+            p.y - 27 + j * 13,
+            10,
+            8,
+            b.type === "farm" ? (j % 2 ? "#b8be6a" : "#75975e") : "#587d91",
+          );
+    } else {
+      const floors =
+          (b.type === "skyscraper"
+            ? 8
+            : b.type === "office"
+              ? 5
+              : b.type === "apartment" ||
+                  b.type === "hospital" ||
+                  b.type === "university"
+                ? 3
+                : 1) +
+          b.level -
+          1,
+        height = Math.min(82, 20 + floors * 7);
+      fill(p.x - 24, p.y - height, 48, height, t.color);
+      fill(p.x + 24, p.y - height, 7, height, "#66827b");
+      fill(
+        p.x - 26,
+        p.y - height - 5,
+        53,
+        6,
+        b.type === "restaurant" ? "#b37460" : "#d2d3bb",
+      );
+      for (let row = 0; row < Math.min(floors, 9); row++)
+        for (let col = 0; col < 4; col++)
+          fill(
+            p.x - 18 + col * 11,
+            p.y - height + 7 + row * 7,
+            5,
+            4,
+            b.type === "lab" ? "#9bd0c9" : "#587d7f",
+          );
+      fill(p.x - 4, p.y - 12, 9, 12, "#57736b");
+      if (b.type === "hospital" || b.type === "clinic") {
+        fill(p.x - 4, p.y - height - 13, 9, 3, "#b2756c");
+        fill(p.x - 1, p.y - height - 16, 3, 9, "#b2756c");
+      }
+      if (b.type === "shop" || b.type === "restaurant")
+        for (let i = 0; i < 6; i++)
+          fill(
+            p.x - 26 + i * 9,
+            p.y - height + 12,
+            9,
+            7,
+            i % 2 ? "#efdeb1" : "#a6775e",
+          );
+    }
+    if (b.integrity < 90) {
+      ctx.fillStyle = "#514b4966";
+      ctx.beginPath();
+      ctx.arc(
+        p.x + 17,
+        p.y - 48 + Math.sin(paintTime * 0.001) * 4,
+        7 + (100 - b.integrity) * 0.06,
+        0,
+        7,
+      );
+      ctx.fill();
+    }
+    ctx.font = "7px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#365547";
+    ctx.fillText(t.name + (b.level > 1 ? " L" + b.level : ""), p.x, p.y + 13);
   }
-  $('#city-guide').onclick=()=>{$('#city-dialog-body').innerHTML='<div class="eyebrow">YOUR CITY CONTROL ROOM</div><h2 class="city-dialog-title">From plot to metropolis.</h2><ol class="city-guide-list"><li><b>Expand:</b> connect up to six cities with Expand region.</li><li><b>Build:</b> choose a blueprint, press Build on the map, then click an empty + plot.</li><li><b>Upgrade:</b> use Inspect, click a building, and upgrade its level.</li><li><b>Research:</b> fund a discovery. Labs and time advance progress and unlock buildings and city bonuses.</li><li><b>Govern:</b> set tax, healthcare, and research budgets in City Hall.</li><li><b>Care:</b> adopt cats and dogs, click them to feed them, and inspect your named residents.</li><li><b>Diplomacy:</b> manage conflict with fictional neighbors. Protect buildings, negotiate peace, and repair.</li><li><b>Divine powers:</b> open the drawer for weather and miracles. Use Original town for targeted resident powers.</li></ol><p class="city-footnote">City population is an aggregate simulation. The named residents are individually inspectable. City progress saves in this browser alongside your town.</p>';dialog.showModal()};
-  document.querySelectorAll('[data-city-section]').forEach(b=>b.onclick=()=>showSection(b.dataset.citySection));$('#view-city').onclick=()=>setView('city');$('#view-village').onclick=()=>setView('village');$('#city-grant').onclick=()=>{state.treasury+=5000;commit('You granted the region <strong>5,000 credits</strong>.','✧');api.toast('5,000 credits added. Build the city you imagine.')};window.addEventListener('pagehide',save);
-  renderPanel();setView(view);refresh();return {tick,render,mapClick,save,refresh,setView,setLocation(id,cityName,enter=true){if(!EARTH_BY_ID[id])return;if(id!==countryId){try{localStorage.setItem(KEY+':'+countryId,JSON.stringify(state))}catch{}countryId=id;let previous;try{previous=JSON.parse(localStorage.getItem(KEY+':'+id))}catch{}state=validateCity(previous)?previous:createCityState();lastSave=0;lastUI=0;}if(cityName)selectedDistrict=Math.max(0,districtNames().indexOf(cityName));renderPanel();if(enter)setView('city');refresh();save();},get active(){return view==='city'},get building(){return mode==='build'},reset(){state=createCityState();lastSave=0;selectedDistrict=0;setView('city');showSection('build');refresh();save()}};
+  $("#city-guide").onclick = () => {
+    $("#city-dialog-body").innerHTML =
+      '<div class="eyebrow">YOUR CITY CONTROL ROOM</div><h2 class="city-dialog-title">From plot to metropolis.</h2><ol class="city-guide-list"><li><b>Expand:</b> connect up to six cities with Expand region.</li><li><b>Build:</b> choose a blueprint, press Build on the map, then click an empty + plot.</li><li><b>Upgrade:</b> use Inspect, click a building, and upgrade its level.</li><li><b>Research:</b> fund a discovery. Labs and time advance progress and unlock buildings and city bonuses.</li><li><b>Govern:</b> set tax, healthcare, and research budgets in City Hall.</li><li><b>Care:</b> adopt cats and dogs, click them to feed them, and inspect your named residents.</li><li><b>Diplomacy:</b> manage conflict with fictional neighbors. Protect buildings, negotiate peace, and repair.</li><li><b>Divine powers:</b> open the drawer for weather and miracles. Use Original town for targeted resident powers.</li></ol><p class="city-footnote">City population is an aggregate simulation. The named residents are individually inspectable. City progress saves in this browser alongside your town.</p>';
+    dialog.showModal();
+  };
+  document
+    .querySelectorAll("[data-city-section]")
+    .forEach((b) => (b.onclick = () => showSection(b.dataset.citySection)));
+  $("#view-city").onclick = () => setView("city");
+  $("#view-village").onclick = () => setView("village");
+  $("#city-grant").onclick = () => {
+    state.treasury += 5000;
+    commit("You granted the region <strong>5,000 credits</strong>.", "✧");
+    api.toast("5,000 credits added. Build the city you imagine.");
+  };
+  window.addEventListener("pagehide", save);
+  renderPanel();
+  setView(view);
+  refresh();
+  return {
+    tick,
+    render,
+    mapClick,
+    save,
+    refresh,
+    setView,
+    setLocation(id, cityName, enter = true) {
+      if (!EARTH_BY_ID[id]) return;
+      if (id !== countryId) {
+        try {
+          localStorage.setItem(KEY + ":" + countryId, JSON.stringify(state));
+        } catch {}
+        countryId = id;
+        let previous;
+        try {
+          previous = JSON.parse(localStorage.getItem(KEY + ":" + id));
+        } catch {}
+        state = validateCity(previous) ? previous : createCityState();
+        lastSave = 0;
+        lastUI = 0;
+      }
+      if (cityName)
+        selectedDistrict = Math.max(0, districtNames().indexOf(cityName));
+      renderPanel();
+      if (enter) setView("city");
+      refresh();
+      save();
+    },
+    get active() {
+      return view === "city";
+    },
+    get building() {
+      return mode === "build";
+    },
+    reset() {
+      state = createCityState();
+      lastSave = 0;
+      selectedDistrict = 0;
+      setView("city");
+      showSection("build");
+      refresh();
+      save();
+    },
+  };
 }

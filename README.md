@@ -16,18 +16,18 @@ Open **http://127.0.0.1:3000**. Optional environment variables: `PORT` (default 
 
 ## Your powers
 
-| Power | What happens |
-| --- | --- |
+| Power                        | What happens                                                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Sunshine, rain, storms, snow | Animated weather with adjustable intensity. People react, seek shelter, and remember the change. Storms periodically strike lightning. |
-| Lightning brush | Click the map to strike. People within range lose health and energy and flee home. |
-| Grow trees | Plant up to 150 trees on the map. Your forest survives a reload. |
-| Bless brush | Restore nearby residents' health, energy, fullness, and social needs. |
-| Teleport | Pick a resident and click land to move them instantly. |
-| Heal everyone | Restore the town's health and energy. |
-| Send a feast | Restore fullness and bring everyone to the market. |
-| Gather the town | Summon everyone to the park to form new connections. |
-| Create a resident | Give someone a name, age, role, biography, color, and favorite place. Up to 40 residents. |
-| Control time | Pause, run at 1×/2×/5×/20×, set the hour, or skip to the next morning. |
+| Lightning brush              | Click the map to strike. People within range lose health and energy and flee home.                                                     |
+| Grow trees                   | Plant up to 150 trees on the map. Your forest survives a reload.                                                                       |
+| Bless brush                  | Restore nearby residents' health, energy, fullness, and social needs.                                                                  |
+| Teleport                     | Pick a resident and click land to move them instantly.                                                                                 |
+| Heal everyone                | Restore the town's health and energy.                                                                                                  |
+| Send a feast                 | Restore fullness and bring everyone to the market.                                                                                     |
+| Gather the town              | Summon everyone to the park to form new connections.                                                                                   |
+| Create a resident            | Give someone a name, age, role, biography, color, and favorite place. Up to 40 residents.                                              |
+| Control time                 | Pause, run at 1×/2×/5×/20×, set the hour, or skip to the next morning.                                                                 |
 
 Click a resident on the map or in the resident list for their biography, personality, live needs, relationships, and memories. Say hello, offer a snack, suggest rest, heal them, or send them to a particular place. Click a building to see its occupants or summon everyone there.
 

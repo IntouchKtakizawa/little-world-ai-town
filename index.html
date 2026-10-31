@@ -1,29 +1,279 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#111c21"><title>Little World — Earth</title><meta name="description" content="A living town in your hands. Shape the weather, create residents, and play a little god."><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="city.css"><link rel="stylesheet" href="world.css"></head>
-<body>
-<div class="app">
-  <aside class="rail"><a class="brand" href="/" aria-label="Little World home"><svg viewBox="0 0 32 32"><path d="M3 16 16 4l13 12v13H3Z" fill="currentColor"/><path d="M12 29V18h8v11" fill="#122027"/><path d="M6 11V4h5v3" fill="currentColor"/></svg></a><div class="rail-divider"></div><button class="rail-button active" id="town-tab" title="Town view" aria-label="Town view">▦</button><button class="rail-button" id="residents-tab" title="Meet the residents" aria-label="Meet the residents">♧</button><button class="rail-button" id="journal-tab" title="Town journal" aria-label="Town journal">≡</button><div class="rail-bottom"><button class="rail-button" id="help" title="About this world" aria-label="About this world">?</button><span class="user-icon">Y</span></div></aside>
-  <main>
-    <header class="topbar"><div class="breadcrumb">Your experiments <span>/</span> <strong>Little World</strong><span class="version">GOD MODE</span></div><button id="reset" class="text-button">↻ <span>New beginning</span></button></header>
-    <section class="heading"><div><div class="eyebrow"><span></span> YOUR WORLD. YOUR RULES. YOUR LITTLE MIRACLES.</div><h1>Our Earth. Your world<span>.</span></h1><p>Explore real countries. Build your future. Shape a different history.</p></div><div class="weather"><span class="sun">☀</span><div><strong id="weather-label">A little sunshine</strong><span id="day-label">Day 1 · Early autumn</span></div></div></section>
-    <section class="workspace">
-      <div class="world-column">
-        <div class="map-card"><div class="map-top"><div class="town-title"><span class="live-dot"></span> WILLOWBROOK <span class="coordinate">35° 41′ N · 139° 41′ E</span></div><div class="map-status" id="map-status">WORLD IS ALIVE</div></div>
-          <div class="canvas-wrap" id="canvas-wrap"><canvas id="world" aria-label="Interactive animated map of Willowbrook. Select a resident using the Residents panel." role="img"></canvas><div class="map-note"><span>↖</span> Click a resident to meet them</div><div class="zoom-controls"><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button></div><div class="map-legend"><span><i class="legend-resident"></i> Resident</span><span><i class="legend-place"></i> Gathering place</span></div><div class="follow-tag" id="follow-tag" hidden></div></div>
-          <div class="simulation-bar"><div class="time"><span class="clock-icon">◷</span><strong id="time">09:00</strong><span id="period">MORNING</span></div><div class="playback"><button id="pause" class="pause-button" aria-label="Pause simulation">Ⅱ</button><div class="speed-options" aria-label="Simulation speed"><button class="selected" data-speed="1">1×</button><button data-speed="2">2×</button><button data-speed="5">5×</button></div></div><div class="simulation-label"><span class="live-dot"></span><span id="simulation-state">Simulation running</span></div></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111c21" />
+    <title>Little World — Earth</title>
+    <meta
+      name="description"
+      content="A living town in your hands. Shape the weather, create residents, and play a little god."
+    />
+    <link rel="icon" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="city.css" />
+    <link rel="stylesheet" href="world.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="rail">
+        <a class="brand" href="/" aria-label="Little World home"
+          ><svg viewBox="0 0 32 32">
+            <path d="M3 16 16 4l13 12v13H3Z" fill="currentColor" />
+            <path d="M12 29V18h8v11" fill="#122027" />
+            <path d="M6 11V4h5v3" fill="currentColor" /></svg
+        ></a>
+        <div class="rail-divider"></div>
+        <button
+          class="rail-button active"
+          id="town-tab"
+          title="Town view"
+          aria-label="Town view"
+        >
+          ▦</button
+        ><button
+          class="rail-button"
+          id="residents-tab"
+          title="Meet the residents"
+          aria-label="Meet the residents"
+        >
+          ♧</button
+        ><button
+          class="rail-button"
+          id="journal-tab"
+          title="Town journal"
+          aria-label="Town journal"
+        >
+          ≡
+        </button>
+        <div class="rail-bottom">
+          <button
+            class="rail-button"
+            id="help"
+            title="About this world"
+            aria-label="About this world"
+          >
+            ?</button
+          ><span class="user-icon">Y</span>
         </div>
-        <div class="world-stats"><div><span class="stat-icon">♧</span><div><strong id="resident-stat">6 <small>residents</small></strong><span>Each with a story</span></div></div><div><span class="stat-icon">⌂</span><div><strong>5 <small>places</small></strong><span>A world to explore</span></div></div><div><span class="stat-icon">♡</span><div><strong id="connection-count">3 <small>connections</small></strong><span>Better together</span></div></div><div><span class="stat-icon">✧</span><div><strong id="mood-stat">Content</strong><span>The town’s mood</span></div></div></div>
-        <section class="events-card"><div class="section-head"><div><span class="eyebrow muted">A LITTLE NUDGE</span><h2>Change the course of the day</h2></div><span class="tiny-badge">YOU’RE THE BUTTERFLY EFFECT</span></div><div class="event-buttons"><button data-event="coffee"><span>☕</span><div><strong>Coffee on the house</strong><small>Bring people together</small></div><b>↗</b></button><button data-event="rain"><span>☂</span><div><strong>A change in the weather</strong><small>Let a little rain in</small></div><b>↗</b></button><button data-event="party"><span>✦</span><div><strong>A town gathering</strong><small>Make a new memory</small></div><b>↗</b></button></div></section>
-        <footer><span><i class="live-dot"></i> A work in progress, just like all of us.</span><button id="how-it-works">How this world works ↗</button></footer>
+      </aside>
+      <main>
+        <header class="topbar">
+          <div class="breadcrumb">
+            Your experiments <span>/</span> <strong>Little World</strong
+            ><span class="version">GOD MODE</span>
+          </div>
+          <button id="reset" class="text-button">
+            ↻ <span>New beginning</span>
+          </button>
+        </header>
+        <section class="heading">
+          <div>
+            <div class="eyebrow">
+              <span></span> YOUR WORLD. YOUR RULES. YOUR LITTLE MIRACLES.
+            </div>
+            <h1>Our Earth. Your world<span>.</span></h1>
+            <p>
+              Explore real countries. Build your future. Shape a different
+              history.
+            </p>
+          </div>
+          <div class="weather">
+            <span class="sun">☀</span>
+            <div>
+              <strong id="weather-label">A little sunshine</strong
+              ><span id="day-label">Day 1 · Early autumn</span>
+            </div>
+          </div>
+        </section>
+        <section class="workspace">
+          <div class="world-column">
+            <div class="map-card">
+              <div class="map-top">
+                <div class="town-title">
+                  <span class="live-dot"></span> WILLOWBROOK
+                  <span class="coordinate">35° 41′ N · 139° 41′ E</span>
+                </div>
+                <div class="map-status" id="map-status">WORLD IS ALIVE</div>
+              </div>
+              <div class="canvas-wrap" id="canvas-wrap">
+                <canvas
+                  id="world"
+                  aria-label="Interactive animated map of Willowbrook. Select a resident using the Residents panel."
+                  role="img"
+                ></canvas>
+                <div class="map-note">
+                  <span>↖</span> Click a resident to meet them
+                </div>
+                <div class="zoom-controls">
+                  <button id="zoom-in" aria-label="Zoom in">+</button
+                  ><button id="zoom-out" aria-label="Zoom out">−</button>
+                </div>
+                <div class="map-legend">
+                  <span><i class="legend-resident"></i> Resident</span
+                  ><span><i class="legend-place"></i> Gathering place</span>
+                </div>
+                <div class="follow-tag" id="follow-tag" hidden></div>
+              </div>
+              <div class="simulation-bar">
+                <div class="time">
+                  <span class="clock-icon">◷</span
+                  ><strong id="time">09:00</strong
+                  ><span id="period">MORNING</span>
+                </div>
+                <div class="playback">
+                  <button
+                    id="pause"
+                    class="pause-button"
+                    aria-label="Pause simulation"
+                  >
+                    Ⅱ
+                  </button>
+                  <div class="speed-options" aria-label="Simulation speed">
+                    <button class="selected" data-speed="1">1×</button
+                    ><button data-speed="2">2×</button
+                    ><button data-speed="5">5×</button>
+                  </div>
+                </div>
+                <div class="simulation-label">
+                  <span class="live-dot"></span
+                  ><span id="simulation-state">Simulation running</span>
+                </div>
+              </div>
+            </div>
+            <div class="world-stats">
+              <div>
+                <span class="stat-icon">♧</span>
+                <div>
+                  <strong id="resident-stat">6 <small>residents</small></strong
+                  ><span>Each with a story</span>
+                </div>
+              </div>
+              <div>
+                <span class="stat-icon">⌂</span>
+                <div>
+                  <strong>5 <small>places</small></strong
+                  ><span>A world to explore</span>
+                </div>
+              </div>
+              <div>
+                <span class="stat-icon">♡</span>
+                <div>
+                  <strong id="connection-count"
+                    >3 <small>connections</small></strong
+                  ><span>Better together</span>
+                </div>
+              </div>
+              <div>
+                <span class="stat-icon">✧</span>
+                <div>
+                  <strong id="mood-stat">Content</strong
+                  ><span>The town’s mood</span>
+                </div>
+              </div>
+            </div>
+            <section class="events-card">
+              <div class="section-head">
+                <div>
+                  <span class="eyebrow muted">A LITTLE NUDGE</span>
+                  <h2>Change the course of the day</h2>
+                </div>
+                <span class="tiny-badge">YOU’RE THE BUTTERFLY EFFECT</span>
+              </div>
+              <div class="event-buttons">
+                <button data-event="coffee">
+                  <span>☕</span>
+                  <div>
+                    <strong>Coffee on the house</strong
+                    ><small>Bring people together</small>
+                  </div>
+                  <b>↗</b></button
+                ><button data-event="rain">
+                  <span>☂</span>
+                  <div>
+                    <strong>A change in the weather</strong
+                    ><small>Let a little rain in</small>
+                  </div>
+                  <b>↗</b></button
+                ><button data-event="party">
+                  <span>✦</span>
+                  <div>
+                    <strong>A town gathering</strong
+                    ><small>Make a new memory</small>
+                  </div>
+                  <b>↗</b>
+                </button>
+              </div>
+            </section>
+            <footer>
+              <span
+                ><i class="live-dot"></i> A work in progress, just like all of
+                us.</span
+              ><button id="how-it-works">How this world works ↗</button>
+            </footer>
+          </div>
+          <aside class="sidebar">
+            <section class="residents-card">
+              <div class="section-head">
+                <h2>The residents <span>06</span></h2>
+                <span class="tiny-status">ALL HERE</span>
+              </div>
+              <p class="section-description">
+                Ordinary people. Unexpected stories.
+              </p>
+              <div id="residents"></div>
+            </section>
+            <section class="activity-card">
+              <div class="section-head">
+                <h2>Life, lately</h2>
+                <span class="live-pill"><i class="live-dot"></i> LIVE</span>
+              </div>
+              <p class="section-description">
+                The little moments that make a town.
+              </p>
+              <div
+                id="activity"
+                aria-live="polite"
+                aria-relevant="additions"
+              ></div>
+              <div class="feed-footer">
+                Every moment becomes a memory <span>✧</span>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+    <dialog id="resident-dialog">
+      <button class="close-dialog" aria-label="Close resident details">
+        ×
+      </button>
+      <div id="resident-detail"></div>
+    </dialog>
+    <dialog id="info-dialog">
+      <button class="close-dialog" aria-label="Close about dialog">×</button>
+      <div class="eyebrow">WELCOME TO WILLOWBROOK</div>
+      <h2>You are the butterfly effect.</h2>
+      <p>
+        Shape the weather, plant a forest, summon lightning, create new
+        residents, and move time itself. Your people react, take shelter, form
+        friendships, and remember what happens.
+      </p>
+      <p>
+        Choose a power, then click the map. Inspect residents for their bio and
+        live needs, heal them or send them somewhere. Your world saves
+        automatically in this browser. Press Save world before leaving for peace
+        of mind.
+      </p>
+      <div class="info-note">
+        This prototype uses a local behavior simulation and contextual dialogue.
+        No external AI service or API key is connected.
       </div>
-      <aside class="sidebar"><section class="residents-card"><div class="section-head"><h2>The residents <span>06</span></h2><span class="tiny-status">ALL HERE</span></div><p class="section-description">Ordinary people. Unexpected stories.</p><div id="residents"></div></section>
-      <section class="activity-card"><div class="section-head"><h2>Life, lately</h2><span class="live-pill"><i class="live-dot"></i> LIVE</span></div><p class="section-description">The little moments that make a town.</p><div id="activity" aria-live="polite" aria-relevant="additions"></div><div class="feed-footer">Every moment becomes a memory <span>✧</span></div></section></aside>
-    </section>
-  </main>
-</div>
-<dialog id="resident-dialog"><button class="close-dialog" aria-label="Close resident details">×</button><div id="resident-detail"></div></dialog>
-<dialog id="info-dialog"><button class="close-dialog" aria-label="Close about dialog">×</button><div class="eyebrow">WELCOME TO WILLOWBROOK</div><h2>You are the butterfly effect.</h2><p>Shape the weather, plant a forest, summon lightning, create new residents, and move time itself. Your people react, take shelter, form friendships, and remember what happens.</p><p>Choose a power, then click the map. Inspect residents for their bio and live needs, heal them or send them somewhere. Your world saves automatically in this browser. Press Save world before leaving for peace of mind.</p><div class="info-note">This prototype uses a local behavior simulation and contextual dialogue. No external AI service or API key is connected.</div><button class="primary-button" id="start-exploring">Let’s explore ↗</button></dialog>
-<div id="toast" role="status"></div>
-<script type="module" src="app.js"></script>
-</body></html>
+      <button class="primary-button" id="start-exploring">
+        Let’s explore ↗
+      </button>
+    </dialog>
+    <div id="toast" role="status"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
