@@ -666,10 +666,7 @@ export function createGodMode(api) {
       affectResident(p, { energy: 60, hunger: -15 });
       api.setGoal(p, p.goal);
     });
-    api.log(
-      "You turned the page. A <strong>new morning</strong> begins.",
-      "☀",
-    );
+    api.log("You turned the page. A <strong>new morning</strong> begins.", "☀");
     api.refresh();
     save();
   };
